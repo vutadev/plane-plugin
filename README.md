@@ -1,8 +1,22 @@
 # Plane Agent Skill
 
-An agent skill for interacting with [Plane](https://plane.so) — an open-source project management platform — via the `plane-sdk` Python library.
+A Claude Code plugin for interacting with [Plane](https://plane.so) — an open-source project management platform — via the `plane-sdk` Python library.
 
-## Prerequisites
+## Installation
+
+### As Claude Code Plugin
+
+```bash
+# Run from this directory
+claude --plugin-dir /path/to/plane-skill
+
+# Or install from local directory
+claude --plugin-dir .
+```
+
+Once loaded, invoke with: `/plane:plane <command>`
+
+### Prerequisites
 
 - Python ≥ 3.10
 - A Plane instance (cloud or self-hosted)
@@ -13,7 +27,7 @@ An agent skill for interacting with [Plane](https://plane.so) — an open-source
 1. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -r skills/plane/requirements.txt
 ```
 
 2. Set environment variables:
@@ -28,27 +42,41 @@ export PLANE_BASE_URL="https://your-plane-instance.com/api/v1"
 3. Verify the connection:
 
 ```bash
-python scripts/plane_verify.py
+python skills/plane/scripts/plane_verify.py
 ```
 
 ## Usage
+
+### Claude Code plugin
+
+```bash
+claude --plugin-dir .
+```
+
+Then invoke:
+
+```text
+/plane:plane init
+```
+
+### CLI scripts
 
 Each script is a standalone CLI tool with sub-commands:
 
 ```bash
 # Projects
-python scripts/plane_projects.py list
-python scripts/plane_projects.py create --name "My Project" --identifier "MP"
+python skills/plane/scripts/plane_projects.py list
+python skills/plane/scripts/plane_projects.py create --name "My Project" --identifier "MP"
 
 # Work Items
-python scripts/plane_work_items.py list --project-id <uuid>
-python scripts/plane_work_items.py create --project-id <uuid> --name "Fix bug"
+python skills/plane/scripts/plane_work_items.py list --project-id <uuid>
+python skills/plane/scripts/plane_work_items.py create --project-id <uuid> --name "Fix bug"
 
 # Cycles
-python scripts/plane_cycles.py list --project-id <uuid>
+python skills/plane/scripts/plane_cycles.py list --project-id <uuid>
 
 # Modules
-python scripts/plane_modules.py list --project-id <uuid>
+python skills/plane/scripts/plane_modules.py list --project-id <uuid>
 ```
 
 All scripts output JSON and accept `--help` for full usage info.
@@ -56,19 +84,18 @@ All scripts output JSON and accept `--help` for full usage info.
 ## Directory Structure
 
 ```
-plane-skill/
-├── SKILL.md                  # Agent skill instructions
-├── scripts/                  # CLI helper scripts
-│   ├── plane_client.py       # Shared auth/client helper
-│   ├── plane_verify.py       # Connection verification
-│   ├── plane_projects.py     # Project management
-│   ├── plane_work_items.py   # Work item management
-│   ├── plane_cycles.py       # Cycle management
-│   ├── plane_modules.py      # Module management
-│   └── ...                   # Extended scripts
-├── examples/                 # Workflow examples
-├── resources/                # Quick-reference docs
-└── tests/                    # Smoke tests
+plane-skill/                  # This IS the plugin directory
+├── .claude-plugin/           # Plugin manifest
+│   └── plugin.json           # Plugin metadata
+├── skills/
+│   └── plane/                # Self-contained skill package
+│       ├── SKILL.md
+│       ├── requirements.txt
+│       ├── scripts/          # CLI helper scripts
+│       └── references/       # API reference docs
+├── tests/                    # Smoke tests
+├── CLAUDE.md
+└── README.md
 ```
 
 ## License

@@ -16,8 +16,10 @@ import sys
 import os
 import pytest
 
-# Ensure project root is on path
+# Ensure skill root is on path
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKILL_ROOT = os.path.join(ROOT, "skills", "plane")
+sys.path.insert(0, SKILL_ROOT)
 sys.path.insert(0, ROOT)
 
 SCRIPTS = [
@@ -70,7 +72,7 @@ class TestHelp:
     @pytest.mark.parametrize("script", SCRIPT_FILES_WITH_HELP)
     def test_help(self, script: str) -> None:
         result = subprocess.run(
-            [sys.executable, os.path.join(ROOT, script), "--help"],
+            [sys.executable, os.path.join(SKILL_ROOT, script), "--help"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -88,10 +90,12 @@ class TestClientHelper:
         monkeypatch.delenv("PLANE_ACCESS_TOKEN", raising=False)
         monkeypatch.delenv("PLANE_WORKSPACE_SLUG", raising=False)
 
-        from scripts.plane_client import get_client
+        from scripts import plane_client
+
+        monkeypatch.setattr(plane_client, "_load_plane_env", lambda: None)
 
         with pytest.raises(SystemExit):
-            get_client()
+            plane_client.get_client()
 
     def test_dump_json(self) -> None:
         from scripts.plane_client import dump_json
@@ -176,7 +180,7 @@ class TestArgParsing:
 
     def test_skill_md_frontmatter(self) -> None:
         """Verify SKILL.md has valid YAML frontmatter."""
-        skill_path = os.path.join(ROOT, "SKILL.md")
+        skill_path = os.path.join(ROOT, "skills/plane/SKILL.md")
         with open(skill_path) as f:
             content = f.read()
 

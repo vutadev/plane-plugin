@@ -11,7 +11,7 @@ This is a **Plane Agent Skill** — a collection of Python CLI scripts for inter
 ### Setup
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+pip install -r skills/plane/requirements.txt
 
 # Set required environment variables
 export PLANE_API_KEY="your-api-key"           # OR use PLANE_ACCESS_TOKEN
@@ -23,13 +23,13 @@ export PLANE_BASE_URL="https://api.plane.so/api/v1"  # Optional (default shown)
 All scripts are standalone CLI tools with subcommands:
 ```bash
 # Verify connection
-python scripts/plane_verify.py
+python skills/plane/scripts/plane_verify.py
 
 # List projects
-python scripts/plane_projects.py list
+python skills/plane/scripts/plane_projects.py list
 
 # Create a work item
-python scripts/plane_work_items.py create --project-id <uuid> --name "Fix bug"
+python skills/plane/scripts/plane_work_items.py create --project-id <uuid> --name "Fix bug"
 ```
 
 ### Testing
@@ -49,21 +49,32 @@ pytest tests/ -v
 ### Directory Structure
 ```
 plane-skill/
-├── scripts/                  # CLI helper scripts (all executable)
-│   ├── plane_client.py       # Shared auth/client helper (imported by others)
-│   ├── plane_verify.py       # Connection verification
-│   ├── plane_projects.py     # Project management (list, create, update, delete)
-│   ├── plane_work_items.py   # Work item (issue) management
-│   ├── plane_cycles.py       # Cycle (sprint) management
-│   ├── plane_modules.py      # Module management
-│   ├── plane_work_item_extras.py  # Comments, links, relations, work-logs, types
-│   └── ...                   # Additional scripts for initiatives, intake, labels, etc.
+├── .claude-plugin/           # Plugin manifest
+│   └── plugin.json           # Plugin metadata (name, version, etc.)
+├── skills/
+│   └── plane/                # Self-contained skill package
+│       ├── SKILL.md          # Agent skill instructions (YAML frontmatter)
+│       ├── requirements.txt  # Single dependency: plane-sdk==0.2.2
+│       ├── scripts/          # CLI helper scripts (all executable)
+│       │   ├── plane_client.py
+│       │   ├── plane_verify.py
+│       │   ├── plane_projects.py
+│       │   ├── plane_work_items.py
+│       │   ├── plane_cycles.py
+│       │   ├── plane_modules.py
+│       │   ├── plane_work_item_extras.py
+│       │   └── ...
+│       └── references/       # Quick-reference docs (API reference, workflows)
 ├── tests/
 │   └── test_smoke.py         # Import tests, --help validation, arg parsing tests
-├── resources/                # Quick-reference docs (API reference, workflows)
-├── examples/                 # Workflow examples
-├── SKILL.md                  # Agent skill instructions (YAML frontmatter)
-└── requirements.txt          # Single dependency: plane-sdk==0.2.2
+├── CLAUDE.md
+└── README.md
+```
+
+**Plugin Structure:** This repository is a Claude Code plugin. The manifest at `.claude-plugin/plugin.json` registers the skill at `skills/plane/SKILL.md`. Test locally with:
+
+```bash
+claude --plugin-dir .
 ```
 
 ### Script Architecture Pattern
@@ -133,8 +144,8 @@ This applies to all `delete` commands across scripts.
 
 Uses a two-level command structure: `resource action`:
 ```bash
-python scripts/plane_work_item_extras.py comments create --project-id <id> --work-item-id <id> --body "..."
-python scripts/plane_work_item_extras.py work-logs list --project-id <id> --work-item-id <id>
+python skills/plane/scripts/plane_work_item_extras.py comments create --project-id <id> --work-item-id <id> --body "..."
+python skills/plane/scripts/plane_work_item_extras.py work-logs list --project-id <id> --work-item-id <id>
 ```
 
 Resources: `activities`, `comments`, `links`, `relations`, `work-logs`, `types`

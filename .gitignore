@@ -17,7 +17,8 @@ build/
 .vscode/
 .idea/
 .env
-.plane.env
+**/.plane.env
+plans
 
 # OS
 .DS_Store

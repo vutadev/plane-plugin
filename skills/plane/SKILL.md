@@ -8,6 +8,16 @@ argument-hint: "[init]"
 
 Interact with [Plane](https://plane.so) — an open-source project management platform — via CLI scripts wrapping `plane-sdk==0.2.2`.
 
+## Path Resolution (Plugin Layout)
+
+This skill is self-contained under `skills/plane/`.
+Resolve all relative paths from this directory:
+
+- Scripts: `scripts/...`
+- References: `references/...`
+- Env file: `.plane.env`
+- Requirements: `requirements.txt`
+
 ## When to Use
 
 - Manage projects, states, labels, members
