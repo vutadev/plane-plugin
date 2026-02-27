@@ -1,6 +1,7 @@
 ---
 name: plane
 description: Manage projects, work items, cycles, modules, and more on the Plane project management platform via the plane-sdk Python library.
+argument-hint: "[init]"
 ---
 
 # Plane Agent Skill
@@ -14,6 +15,11 @@ Interact with [Plane](https://plane.so) — an open-source project management pl
 - Plan sprints with cycles; transfer items between sprints
 - Organize work into modules; manage initiatives and intake triage
 - Search work items across the workspace
+
+## Argument Handling
+
+If `$ARGUMENTS` equals `init`, run the setup procedure below and stop.
+Otherwise, proceed with the full skill instructions.
 
 ## Setup (`/plane init`)
 
