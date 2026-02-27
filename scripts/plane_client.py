@@ -16,11 +16,30 @@ from __future__ import annotations
 import os
 import sys
 import json
+from pathlib import Path
 
 from plane import PlaneClient
 
 
 DEFAULT_BASE_URL = "https://api.plane.so/api/v1"
+
+
+def _load_plane_env() -> None:
+    """Load .plane.env from skill root if vars not already set."""
+    env_file = Path(__file__).resolve().parent.parent / ".plane.env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        # Don't override existing env vars
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def get_client() -> tuple["PlaneClient", str]:
@@ -32,6 +51,7 @@ def get_client() -> tuple["PlaneClient", str]:
     Raises:
         SystemExit: if required env vars are missing.
     """
+    _load_plane_env()
     api_key = os.environ.get("PLANE_API_KEY")
     access_token = os.environ.get("PLANE_ACCESS_TOKEN")
     workspace_slug = os.environ.get("PLANE_WORKSPACE_SLUG")
