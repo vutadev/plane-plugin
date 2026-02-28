@@ -15,7 +15,7 @@ Resolve all relative paths from this directory:
 
 - Scripts: `scripts/...`
 - References: `references/...`
-- Env file: `.plane.env`
+- Env file: `$PROJECT_DIR/.plane.env` by default (fallback: `./.plane.env`), override with `PLANE_ENV_FILE`
 - Requirements: `requirements.txt`
 
 ## When to Use
@@ -39,19 +39,30 @@ Run the interactive setup to install Python deps and configure `.plane.env`:
 bash scripts/plane_setup.sh
 ```
 
-This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.plane.env` is missing, and verify the connection.
+This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.plane.env` is missing, write to `$PROJECT_DIR/.plane.env` (or `PLANE_ENV_FILE`), and verify the connection.
 
 ## Pre-flight (Run Once Per Session)
 
 Load env and verify connection before running any other script:
 
 ```bash
-set -a; source .plane.env 2>/dev/null; set +a
+PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+ENV_FILE="${PLANE_ENV_FILE:-$PROJECT_DIR/.plane.env}"
+set -a; [ -f "$ENV_FILE" ] && source "$ENV_FILE"; set +a
 PYTHON=$(command -v python3 || command -v python)
 $PYTHON scripts/plane_verify.py
 ```
 
 If verify fails → run `bash scripts/plane_setup.sh` or check `references/troubleshooting.md`.
+
+## Logout / Clear Credentials
+
+```bash
+bash scripts/plane_logout.sh --confirm
+unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
+```
+
+`plane_logout.sh` removes `.plane.env` from project-local and legacy skill-local locations.
 
 ## Safety Controls
 

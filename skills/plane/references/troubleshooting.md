@@ -12,6 +12,10 @@
 ## Auth Setup
 
 ```bash
+# Recommended (writes .plane.env to $PROJECT_DIR/.plane.env)
+bash scripts/plane_setup.sh
+
+# Or manual exports:
 export PLANE_API_KEY="plane-api-key-here"        # OR
 export PLANE_ACCESS_TOKEN="plane-pat-here"
 export PLANE_WORKSPACE_SLUG="my-workspace"
@@ -30,3 +34,10 @@ $PYTHON scripts/plane_verify.py
 ```
 
 If `plane_verify.py` fails → STOP. Fix auth before running other commands.
+
+## Logout / Credential Reset
+
+```bash
+bash scripts/plane_logout.sh --confirm
+unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
+```

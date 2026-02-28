@@ -8,7 +8,7 @@ A Claude Code plugin for interacting with [Plane](https://plane.so) — an open-
 
 ```bash
 # Run from this directory
-claude --plugin-dir /path/to/plane-skill
+claude --plugin-dir /path/to/plane-plugin
 
 # Or install from local directory
 claude --plugin-dir .
@@ -30,12 +30,14 @@ Once loaded, invoke with: `/plane:plane <command>`
 pip install -r skills/plane/requirements.txt
 ```
 
-2. Set environment variables:
+2. Set environment variables (or run setup to create `.plane.env` in your project directory):
 
 ```bash
+bash skills/plane/scripts/plane_setup.sh
+# OR manually export:
 export PLANE_API_KEY="your-api-key"
 export PLANE_WORKSPACE_SLUG="your-workspace-slug"
-# Optional — defaults to https://api.plane.so
+# Optional — defaults to https://api.plane.so/api/v1
 export PLANE_BASE_URL="https://your-plane-instance.com/api/v1"
 ```
 
@@ -81,10 +83,17 @@ python skills/plane/scripts/plane_modules.py list --project-id <uuid>
 
 All scripts output JSON and accept `--help` for full usage info.
 
+## Logout / Clear Credentials
+
+```bash
+bash skills/plane/scripts/plane_logout.sh --confirm
+unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
+```
+
 ## Directory Structure
 
 ```
-plane-skill/                  # This IS the plugin directory
+plane-plugin/                 # This IS the plugin directory
 ├── .claude-plugin/           # Plugin manifest
 │   └── plugin.json           # Plugin metadata
 ├── skills/
