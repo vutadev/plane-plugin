@@ -9,6 +9,16 @@ Environment variables:
     PLANE_ACCESS_TOKEN     – Plane personal access token (alternative to API key)
     PLANE_WORKSPACE_SLUG   – Workspace slug (required)
     PLANE_BASE_URL         – Base URL of the Plane API (default: https://api.plane.so/api/v1)
+
+Optional env-file resolution controls:
+    PLANE_ENV_FILE         – Explicit env file path (absolute, or relative to PROJECT_DIR/cwd)
+    PROJECT_DIR            – Project root used for .plane.env lookup
+
+Env-file lookup order:
+    1) PLANE_ENV_FILE (if set)
+    2) PROJECT_DIR/.plane.env (if PROJECT_DIR set)
+    3) CWD/.plane.env
+    4) Legacy skill-local file (skills/plane/.plane.env)
 """
 
 from __future__ import annotations
@@ -24,11 +34,53 @@ from plane import PlaneClient
 DEFAULT_BASE_URL = "https://api.plane.so/api/v1"
 
 
+def _plane_env_candidates() -> list[Path]:
+    """Return candidate .plane.env paths in resolution order."""
+    candidates: list[Path] = []
+
+    env_override = os.environ.get("PLANE_ENV_FILE")
+    if env_override:
+        override_path = Path(env_override).expanduser()
+        if not override_path.is_absolute():
+            base = Path(os.environ.get("PROJECT_DIR") or os.getcwd())
+            override_path = base / override_path
+        candidates.append(override_path)
+
+    project_dir = os.environ.get("PROJECT_DIR")
+    if project_dir:
+        candidates.append(Path(project_dir).expanduser() / ".plane.env")
+
+    candidates.append(Path.cwd() / ".plane.env")
+
+    # Backward compatibility with old location
+    candidates.append(Path(__file__).resolve().parent.parent / ".plane.env")
+
+    # De-duplicate while preserving order
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return deduped
+
+
+def _resolve_plane_env_file() -> Path | None:
+    """Resolve the first existing .plane.env file."""
+    for env_file in _plane_env_candidates():
+        if env_file.exists():
+            return env_file
+    return None
+
+
 def _load_plane_env() -> None:
-    """Load .plane.env from skill root if vars not already set."""
-    env_file = Path(__file__).resolve().parent.parent / ".plane.env"
-    if not env_file.exists():
+    """Load .plane.env from resolved location if vars not already set."""
+    env_file = _resolve_plane_env_file()
+    if env_file is None:
         return
+
     for line in env_file.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -105,11 +157,13 @@ def dump_json(data: object) -> str:
 if __name__ == "__main__":
     try:
         client, slug = get_client()
+        env_file = _resolve_plane_env_file()
         print(dump_json({
             "status": "ok",
             "workspace_slug": slug,
             "base_url": client.config.base_path,
             "auth_method": "api_key" if client.config.api_key else "access_token",
+            "env_file": str(env_file) if env_file else None,
         }))
     except SystemExit:
         pass  # error already printed

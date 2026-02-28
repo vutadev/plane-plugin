@@ -5,7 +5,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
-ENV_FILE="$SKILL_DIR/.plane.env"
+PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+DEFAULT_ENV_FILE="$PROJECT_DIR/.plane.env"
+ENV_FILE="${PLANE_ENV_FILE:-$DEFAULT_ENV_FILE}"
+# Resolve relative override against project dir
+if [[ "$ENV_FILE" != /* ]]; then
+  ENV_FILE="$PROJECT_DIR/$ENV_FILE"
+fi
+LEGACY_ENV_FILE="$SKILL_DIR/.plane.env"
 REQ_FILE="$SKILL_DIR/requirements.txt"
 
 # Colors (fallback to plain if no tty)
@@ -19,6 +26,23 @@ info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+load_env_from_file() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  set -a
+  while IFS='=' read -r key value; do
+    key=$(echo "$key" | xargs)
+    [[ -z "$key" || "$key" == \#* ]] && continue
+    value=$(echo "$value" | xargs)
+    # Only set if not already in environment
+    if [ -z "${!key:-}" ]; then
+      export "$key=$value"
+    fi
+  done < "$file"
+  set +a
+}
 
 # --- Step 1: Detect or install Python ---
 detect_python() {
@@ -77,24 +101,14 @@ fi
 echo ""
 info "Checking Plane configuration..."
 
-load_env() {
-  if [ -f "$ENV_FILE" ]; then
-    # Source env file, ignoring comments and empty lines
-    set -a
-    while IFS='=' read -r key value; do
-      key=$(echo "$key" | xargs)
-      [[ -z "$key" || "$key" == \#* ]] && continue
-      value=$(echo "$value" | xargs)
-      # Only set if not already in environment
-      if [ -z "${!key:-}" ]; then
-        export "$key=$value"
-      fi
-    done < "$ENV_FILE"
-    set +a
-  fi
-}
-
-load_env
+ACTIVE_ENV_FILE="$ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
+  load_env_from_file "$ENV_FILE"
+elif [ -f "$LEGACY_ENV_FILE" ]; then
+  warn "Using legacy env file at $LEGACY_ENV_FILE"
+  ACTIVE_ENV_FILE="$LEGACY_ENV_FILE"
+  load_env_from_file "$LEGACY_ENV_FILE"
+fi
 
 needs_setup=false
 [ -z "${PLANE_API_KEY:-}" ] && [ -z "${PLANE_ACCESS_TOKEN:-}" ] && needs_setup=true
@@ -103,7 +117,7 @@ needs_setup=false
 if [ "$needs_setup" = true ]; then
   if [ ! -t 0 ]; then
     err ".plane.env not configured and stdin is not interactive."
-    err "Create $ENV_FILE with: PLANE_API_KEY, PLANE_WORKSPACE_SLUG"
+    err "Create $ENV_FILE with: PLANE_API_KEY (or PLANE_ACCESS_TOKEN), PLANE_WORKSPACE_SLUG"
     exit 1
   fi
 
@@ -136,7 +150,8 @@ if [ "$needs_setup" = true ]; then
   read -rp "Base URL [$current_url]: " input_url
   base_url="${input_url:-$current_url}"
 
-  # Write .plane.env
+  # Write .plane.env to project-local location (or override via PLANE_ENV_FILE)
+  mkdir -p "$(dirname "$ENV_FILE")"
   cat > "$ENV_FILE" <<EOF
 # Plane API Configuration
 PLANE_API_KEY=$api_key
@@ -144,14 +159,18 @@ PLANE_WORKSPACE_SLUG=$workspace_slug
 PLANE_BASE_URL=$base_url
 EOF
 
-  ok "Saved to $ENV_FILE"
+  ACTIVE_ENV_FILE="$ENV_FILE"
+  ok "Saved to $ACTIVE_ENV_FILE"
 
   # Reload
   export PLANE_API_KEY="$api_key"
   export PLANE_WORKSPACE_SLUG="$workspace_slug"
   export PLANE_BASE_URL="$base_url"
 else
-  ok ".plane.env configured (workspace: ${PLANE_WORKSPACE_SLUG})"
+  ok "Plane environment configured (source: $ACTIVE_ENV_FILE)"
+  if [ "$ACTIVE_ENV_FILE" = "$LEGACY_ENV_FILE" ] && [ "$ENV_FILE" != "$LEGACY_ENV_FILE" ]; then
+    warn "Consider moving env file to $ENV_FILE"
+  fi
 fi
 
 # --- Step 5: Verify connection ---
