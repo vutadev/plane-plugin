@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
-# Plane skill setup — install Python, dependencies, and configure .plane.env
+# Plane skill setup — install Python, dependencies, and configure .planerc
 # Usage: bash scripts/plane_setup.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-DEFAULT_ENV_FILE="$PROJECT_DIR/.plane.env"
-ENV_FILE="${PLANE_ENV_FILE:-$DEFAULT_ENV_FILE}"
-# Resolve relative override against project dir
-if [[ "$ENV_FILE" != /* ]]; then
-  ENV_FILE="$PROJECT_DIR/$ENV_FILE"
-fi
-LEGACY_ENV_FILE="$SKILL_DIR/.plane.env"
 REQ_FILE="$SKILL_DIR/requirements.txt"
+GLOBAL_RC="$HOME/.planerc"
+LOCAL_RC="$(pwd)/.planerc"
 
 # Colors (fallback to plain if no tty)
 if [ -t 1 ]; then
@@ -26,23 +20,6 @@ info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-
-load_env_from_file() {
-  local file="$1"
-  [ -f "$file" ] || return 0
-
-  set -a
-  while IFS='=' read -r key value; do
-    key=$(echo "$key" | xargs)
-    [[ -z "$key" || "$key" == \#* ]] && continue
-    value=$(echo "$value" | xargs)
-    # Only set if not already in environment
-    if [ -z "${!key:-}" ]; then
-      export "$key=$value"
-    fi
-  done < "$file"
-  set +a
-}
 
 # --- Step 1: Detect or install Python ---
 detect_python() {
@@ -97,80 +74,90 @@ else
   ok "plane-sdk installed"
 fi
 
-# --- Step 4: Configure .plane.env ---
+# --- Step 4: Configure .planerc ---
 echo ""
 info "Checking Plane configuration..."
 
-ACTIVE_ENV_FILE="$ENV_FILE"
-if [ -f "$ENV_FILE" ]; then
-  load_env_from_file "$ENV_FILE"
-elif [ -f "$LEGACY_ENV_FILE" ]; then
-  warn "Using legacy env file at $LEGACY_ENV_FILE"
-  ACTIVE_ENV_FILE="$LEGACY_ENV_FILE"
-  load_env_from_file "$LEGACY_ENV_FILE"
+# Check existing configs for required fields
+needs_setup=true
+existing_config=""
+if [ -f "$LOCAL_RC" ]; then
+  existing_config="$LOCAL_RC"
+elif [ -f "$GLOBAL_RC" ]; then
+  existing_config="$GLOBAL_RC"
 fi
 
-needs_setup=false
-[ -z "${PLANE_API_KEY:-}" ] && [ -z "${PLANE_ACCESS_TOKEN:-}" ] && needs_setup=true
-[ -z "${PLANE_WORKSPACE_SLUG:-}" ] && needs_setup=true
+if [ -n "$existing_config" ]; then
+  if "$PYTHON" -c "
+import json, sys
+with open('$existing_config') as f:
+    c = json.load(f)
+if c.get('apiKey') or c.get('accessToken'):
+    if c.get('workspace'):
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
+    needs_setup=false
+    ok "Plane configured (source: $existing_config)"
+  fi
+fi
 
 if [ "$needs_setup" = true ]; then
   if [ ! -t 0 ]; then
-    err ".plane.env not configured and stdin is not interactive."
-    err "Create $ENV_FILE with: PLANE_API_KEY (or PLANE_ACCESS_TOKEN), PLANE_WORKSPACE_SLUG"
+    err ".planerc not configured and stdin is not interactive."
+    err "Create ~/.planerc or ./.planerc with: {\"apiKey\": \"...\", \"workspace\": \"...\"}"
     exit 1
   fi
 
   echo ""
   info "Let's configure your Plane connection."
-  echo "  Get your API key from: Plane → Settings → API Tokens → Create new token"
+  echo "  Get your API key from: Plane > Settings > API Tokens > Create new token"
   echo "  Find workspace slug in your URL: https://app.plane.so/<workspace-slug>/..."
   echo ""
 
+  # Config location choice
+  echo "Where should the config be saved?"
+  echo "  1) Global  (~/.planerc) — shared across all projects"
+  echo "  2) Local   (./.planerc) — this project only"
+  read -rp "Choice [1]: " location_choice
+  case "${location_choice:-1}" in
+    1) RC_FILE="$GLOBAL_RC" ;;
+    2) RC_FILE="$LOCAL_RC" ;;
+    *) err "Invalid choice"; exit 1 ;;
+  esac
+
   # API Key
-  current_key="${PLANE_API_KEY:-${PLANE_ACCESS_TOKEN:-}}"
-  read -rp "Plane API Key [$( [ -n "$current_key" ] && echo '***set***' || echo 'required')]: " input_key
-  api_key="${input_key:-$current_key}"
+  read -rp "Plane API Key [required]: " api_key
   if [ -z "$api_key" ]; then
     err "API key is required."
     exit 1
   fi
 
   # Workspace slug
-  current_slug="${PLANE_WORKSPACE_SLUG:-}"
-  read -rp "Workspace slug [$( [ -n "$current_slug" ] && echo "$current_slug" || echo 'required')]: " input_slug
-  workspace_slug="${input_slug:-$current_slug}"
+  read -rp "Workspace slug [required]: " workspace_slug
   if [ -z "$workspace_slug" ]; then
     err "Workspace slug is required."
     exit 1
   fi
 
   # Base URL
-  current_url="${PLANE_BASE_URL:-https://api.plane.so}"
-  read -rp "Base URL [$current_url]: " input_url
-  base_url="${input_url:-$current_url}"
+  read -rp "Base URL [https://api.plane.so/api/v1]: " base_url
+  base_url="${base_url:-https://api.plane.so/api/v1}"
 
-  # Write .plane.env to project-local location (or override via PLANE_ENV_FILE)
-  mkdir -p "$(dirname "$ENV_FILE")"
-  cat > "$ENV_FILE" <<EOF
-# Plane API Configuration
-PLANE_API_KEY=$api_key
-PLANE_WORKSPACE_SLUG=$workspace_slug
-PLANE_BASE_URL=$base_url
-EOF
+  # Write JSON config with 0o600 permissions (pass values via env vars to avoid injection)
+  API_KEY="$api_key" WORKSPACE="$workspace_slug" BASE_URL="$base_url" TARGET_RC="$RC_FILE" \
+    "$PYTHON" -c "
+import json, os
+config = {'apiKey': os.environ['API_KEY'], 'workspace': os.environ['WORKSPACE'], 'baseUrl': os.environ['BASE_URL']}
+path = os.environ['TARGET_RC']
+os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+with open(path, 'w') as f:
+    json.dump(config, f, indent=2)
+    f.write('\n')
+os.chmod(path, 0o600)
+"
 
-  ACTIVE_ENV_FILE="$ENV_FILE"
-  ok "Saved to $ACTIVE_ENV_FILE"
-
-  # Reload
-  export PLANE_API_KEY="$api_key"
-  export PLANE_WORKSPACE_SLUG="$workspace_slug"
-  export PLANE_BASE_URL="$base_url"
-else
-  ok "Plane environment configured (source: $ACTIVE_ENV_FILE)"
-  if [ "$ACTIVE_ENV_FILE" = "$LEGACY_ENV_FILE" ] && [ "$ENV_FILE" != "$LEGACY_ENV_FILE" ]; then
-    warn "Consider moving env file to $ENV_FILE"
-  fi
+  ok "Saved to $RC_FILE"
 fi
 
 # --- Step 5: Verify connection ---

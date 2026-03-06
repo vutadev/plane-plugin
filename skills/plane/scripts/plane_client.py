@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
 """Shared helper for Plane SDK client initialization.
 
-Reads configuration from environment variables and returns
+Reads configuration from .planerc JSON files and returns
 a ready-to-use (PlaneClient, workspace_slug) tuple.
 
-Environment variables:
-    PLANE_API_KEY          – Plane API key (required unless PLANE_ACCESS_TOKEN is set)
-    PLANE_ACCESS_TOKEN     – Plane personal access token (alternative to API key)
-    PLANE_WORKSPACE_SLUG   – Workspace slug (required)
-    PLANE_BASE_URL         – Base URL of the Plane API (default: https://api.plane.so/api/v1)
+Config resolution:
+    1) ~/.planerc (global config)
+    2) CWD/.planerc (project-local override, field-level merge)
 
-Optional env-file resolution controls:
-    PLANE_ENV_FILE         – Explicit env file path (absolute, or relative to PROJECT_DIR/cwd)
-    PROJECT_DIR            – Project root used for .plane.env lookup
-
-Env-file lookup order:
-    1) PLANE_ENV_FILE (if set)
-    2) PROJECT_DIR/.plane.env (if PROJECT_DIR set)
-    3) CWD/.plane.env
-    4) Legacy skill-local file (skills/plane/.plane.env)
+JSON schema (shared with TS CLI):
+    {"apiKey": "...", "workspace": "...", "baseUrl": "..."}
+    Optional: {"accessToken": "..."} (alternative to apiKey)
 """
 
 from __future__ import annotations
 
-import os
 import sys
 import json
 from pathlib import Path
@@ -31,99 +22,65 @@ from pathlib import Path
 from plane import PlaneClient
 
 
-DEFAULT_BASE_URL = "https://api.plane.so/api/v1"
+DEFAULT_BASE_URL = "https://api.plane.so"
 
 
-def _plane_env_candidates() -> list[Path]:
-    """Return candidate .plane.env paths in resolution order."""
-    candidates: list[Path] = []
+def _load_planerc_config() -> dict:
+    """Load config from ~/.planerc (global) merged with CWD/.planerc (local).
 
-    env_override = os.environ.get("PLANE_ENV_FILE")
-    if env_override:
-        override_path = Path(env_override).expanduser()
-        if not override_path.is_absolute():
-            base = Path(os.environ.get("PROJECT_DIR") or os.getcwd())
-            override_path = base / override_path
-        candidates.append(override_path)
+    Returns merged config dict. Project-local values override global.
+    """
+    config: dict = {}
+    global_path = Path.home() / ".planerc"
+    local_path = Path.cwd() / ".planerc"
 
-    project_dir = os.environ.get("PROJECT_DIR")
-    if project_dir:
-        candidates.append(Path(project_dir).expanduser() / ".plane.env")
+    for path in [global_path, local_path]:
+        if path.is_file():
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                config.update(data)
+            except json.JSONDecodeError as exc:
+                print(f"ERROR: Failed to parse {path}: {exc}", file=sys.stderr)
+                sys.exit(1)
+            except OSError as exc:
+                print(f"ERROR: Cannot read {path}: {exc}", file=sys.stderr)
+                sys.exit(1)
 
-    candidates.append(Path.cwd() / ".plane.env")
-
-    # Backward compatibility with old location
-    candidates.append(Path(__file__).resolve().parent.parent / ".plane.env")
-
-    # De-duplicate while preserving order
-    deduped: list[Path] = []
-    seen: set[str] = set()
-    for path in candidates:
-        key = str(path.resolve()) if path.exists() else str(path)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(path)
-    return deduped
-
-
-def _resolve_plane_env_file() -> Path | None:
-    """Resolve the first existing .plane.env file."""
-    for env_file in _plane_env_candidates():
-        if env_file.exists():
-            return env_file
-    return None
-
-
-def _load_plane_env() -> None:
-    """Load .plane.env from resolved location if vars not already set."""
-    env_file = _resolve_plane_env_file()
-    if env_file is None:
-        return
-
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key, value = key.strip(), value.strip()
-        # Don't override existing env vars
-        if key and key not in os.environ:
-            os.environ[key] = value
+    return config
 
 
 def get_client() -> tuple["PlaneClient", str]:
-    """Create a PlaneClient from environment variables.
+    """Create a PlaneClient from .planerc config files.
 
     Returns:
         (PlaneClient, workspace_slug) tuple
 
     Raises:
-        SystemExit: if required env vars are missing.
+        SystemExit: if required config fields are missing.
     """
-    _load_plane_env()
-    api_key = os.environ.get("PLANE_API_KEY")
-    access_token = os.environ.get("PLANE_ACCESS_TOKEN")
-    workspace_slug = os.environ.get("PLANE_WORKSPACE_SLUG")
-    base_url = os.environ.get("PLANE_BASE_URL", DEFAULT_BASE_URL)
+    config = _load_planerc_config()
+
+    api_key = config.get("apiKey")
+    access_token = config.get("accessToken")
+    workspace = config.get("workspace")
+    base_url = config.get("baseUrl", DEFAULT_BASE_URL)
 
     errors: list[str] = []
 
     if not api_key and not access_token:
         errors.append(
-            "Either PLANE_API_KEY or PLANE_ACCESS_TOKEN must be set."
+            "Either 'apiKey' or 'accessToken' must be set in .planerc."
         )
 
-    if not workspace_slug:
-        errors.append("PLANE_WORKSPACE_SLUG must be set.")
+    if not workspace:
+        errors.append("'workspace' must be set in .planerc.")
 
     if errors:
         for err in errors:
             print(f"ERROR: {err}", file=sys.stderr)
         print(
-            "\nPlease set the required environment variables and try again.",
+            '\nCreate ~/.planerc or ./.planerc with: {"apiKey": "...", "workspace": "..."}',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -134,7 +91,7 @@ def get_client() -> tuple["PlaneClient", str]:
         access_token=access_token if not api_key else None,
     )
 
-    return client, workspace_slug  # type: ignore[return-value]
+    return client, workspace  # type: ignore[return-value]
 
 
 def json_serial(obj: object) -> str:
@@ -157,13 +114,17 @@ def dump_json(data: object) -> str:
 if __name__ == "__main__":
     try:
         client, slug = get_client()
-        env_file = _resolve_plane_env_file()
+        global_rc = Path.home() / ".planerc"
+        local_rc = Path.cwd() / ".planerc"
         print(dump_json({
             "status": "ok",
             "workspace_slug": slug,
             "base_url": client.config.base_path,
             "auth_method": "api_key" if client.config.api_key else "access_token",
-            "env_file": str(env_file) if env_file else None,
+            "config_sources": {
+                "global": str(global_rc) if global_rc.is_file() else None,
+                "local": str(local_rc) if local_rc.is_file() else None,
+            },
         }))
     except SystemExit:
         pass  # error already printed

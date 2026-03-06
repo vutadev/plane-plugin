@@ -15,7 +15,7 @@ Resolve all relative paths from this directory:
 
 - Scripts: `scripts/...`
 - References: `references/...`
-- Env file: `$PROJECT_DIR/.plane.env` by default (fallback: `./.plane.env`), override with `PLANE_ENV_FILE`
+- Config: `~/.planerc` (global) + `./.planerc` (project override, JSON format)
 - Requirements: `requirements.txt`
 
 ## When to Use
@@ -33,36 +33,32 @@ Otherwise, proceed with the full skill instructions.
 
 ## Setup (`/plane init`)
 
-Run the interactive setup to install Python deps and configure `.plane.env`:
+Run the interactive setup to install Python deps and configure `.planerc`:
 
 ```bash
 bash scripts/plane_setup.sh
 ```
 
-This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.plane.env` is missing, write to `$PROJECT_DIR/.plane.env` (or `PLANE_ENV_FILE`), and verify the connection.
+This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.planerc` is missing, ask whether to save globally (`~/.planerc`) or locally (`./.planerc`), and verify the connection.
 
 ## Pre-flight (Run Once Per Session)
 
-Load env and verify connection before running any other script:
+Verify connection before running any other script:
 
 ```bash
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-ENV_FILE="${PLANE_ENV_FILE:-$PROJECT_DIR/.plane.env}"
-set -a; [ -f "$ENV_FILE" ] && source "$ENV_FILE"; set +a
 PYTHON=$(command -v python3 || command -v python)
 $PYTHON scripts/plane_verify.py
 ```
 
-If verify fails → run `bash scripts/plane_setup.sh` or check `references/troubleshooting.md`.
+If verify fails, check that `~/.planerc` or `./.planerc` exists with valid JSON, or run `bash scripts/plane_setup.sh`. See `references/troubleshooting.md` for details.
 
 ## Logout / Clear Credentials
 
 ```bash
 bash scripts/plane_logout.sh --confirm
-unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
 ```
 
-`plane_logout.sh` removes `.plane.env` from project-local and legacy skill-local locations.
+`plane_logout.sh` removes `.planerc` from both global (`~/.planerc`) and project-local locations. Note: removing the global config affects all projects.
 
 ## Safety Controls
 

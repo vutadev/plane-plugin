@@ -4,26 +4,42 @@
 |-------|-------|-----|
 | `python: command not found` | No `python` binary | Use `python3` or `PYTHON=$(command -v python3)` |
 | `ModuleNotFoundError: No module named 'plane'` | SDK not installed | `pip install -r requirements.txt` (or `pip3`, or `$PYTHON -m pip`) |
-| `PLANE_API_KEY or PLANE_ACCESS_TOKEN must be set` | Missing auth var | `export PLANE_API_KEY="your-key"` — get from Plane → Settings → API Tokens |
-| `PLANE_WORKSPACE_SLUG must be set` | Missing workspace var | `export PLANE_WORKSPACE_SLUG="slug"` — find in your Plane URL |
+| `'apiKey' or 'accessToken' must be set in .planerc` | Missing auth in config | Create `~/.planerc` with `{"apiKey": "your-key", "workspace": "..."}` — get key from Plane → Settings → API Tokens |
+| `'workspace' must be set in .planerc` | Missing workspace in config | Add `"workspace": "slug"` to `.planerc` — find slug in your Plane URL |
 | `Failed to get current user` / 401 | Invalid/expired token | Regenerate token in Plane → Settings → API Tokens |
-| `Failed to list projects` / 404 | Wrong slug or base URL | Verify `PLANE_WORKSPACE_SLUG`; check `PLANE_BASE_URL` for self-hosted |
+| `Failed to list projects` / 404 | Wrong slug or base URL | Verify `workspace` in `.planerc`; check `baseUrl` for self-hosted |
+| `Failed to parse ~/.planerc` | Malformed JSON | Validate JSON syntax (check for trailing commas, missing quotes) |
 
 ## Auth Setup
 
 ```bash
-# Recommended (writes .plane.env to $PROJECT_DIR/.plane.env)
+# Recommended (interactive setup, prompts for global vs local):
 bash scripts/plane_setup.sh
 
-# Or manual exports:
-export PLANE_API_KEY="plane-api-key-here"        # OR
-export PLANE_ACCESS_TOKEN="plane-pat-here"
-export PLANE_WORKSPACE_SLUG="my-workspace"
-export PLANE_BASE_URL="https://your-instance.com/api/v1"  # only for self-hosted
+# Or create .planerc manually:
+# Global config (all projects):
+cat > ~/.planerc << 'EOF'
+{
+  "apiKey": "plane-api-key-here",
+  "workspace": "my-workspace",
+  "baseUrl": "https://api.plane.so/api/v1"
+}
+EOF
+chmod 600 ~/.planerc
+
+# Or project-local config (overrides global):
+cat > .planerc << 'EOF'
+{
+  "apiKey": "plane-api-key-here",
+  "workspace": "my-workspace"
+}
+EOF
+chmod 600 .planerc
 ```
 
 - API key: Plane → Settings → API Tokens → Create new token
 - Workspace slug: in your Plane URL `https://app.plane.so/<workspace-slug>/...`
+- Config format: JSON with fields `apiKey`, `workspace`, `baseUrl` (optional `accessToken` as alternative to `apiKey`)
 
 ## Pre-flight Check
 
@@ -33,11 +49,12 @@ $PYTHON -c "import plane" 2>/dev/null || pip install -r requirements.txt
 $PYTHON scripts/plane_verify.py
 ```
 
-If `plane_verify.py` fails → STOP. Fix auth before running other commands.
+If `plane_verify.py` fails → STOP. Fix config before running other commands.
 
 ## Logout / Credential Reset
 
 ```bash
 bash scripts/plane_logout.sh --confirm
-unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
 ```
+
+This removes both `~/.planerc` (global) and `./.planerc` (project-local). Note: removing global config affects all projects.

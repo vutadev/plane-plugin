@@ -5,7 +5,7 @@ including states, labels, and initial work items.
 
 ## Prerequisites
 
-- Environment variables set (`PLANE_API_KEY`, `PLANE_WORKSPACE_SLUG`)
+- Config file set up (`~/.planerc` or `./.planerc` with `apiKey` and `workspace`)
 - Connection verified: `python scripts/plane_verify.py`
 
 ## Steps

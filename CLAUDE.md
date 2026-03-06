@@ -13,10 +13,21 @@ This is a **Plane Agent Skill** — a collection of Python CLI scripts for inter
 # Install dependencies
 pip install -r skills/plane/requirements.txt
 
-# Set required environment variables
-export PLANE_API_KEY="your-api-key"           # OR use PLANE_ACCESS_TOKEN
-export PLANE_WORKSPACE_SLUG="your-workspace"
-export PLANE_BASE_URL="https://api.plane.so/api/v1"  # Optional (default shown)
+# Configure credentials via .planerc (JSON format):
+# Global config (all projects):
+cat > ~/.planerc << 'EOF'
+{"apiKey": "your-api-key", "workspace": "your-workspace", "baseUrl": "https://api.plane.so/api/v1"}
+EOF
+chmod 600 ~/.planerc
+
+# OR project-local config (overrides global):
+cat > .planerc << 'EOF'
+{"apiKey": "your-api-key", "workspace": "your-workspace"}
+EOF
+chmod 600 .planerc
+
+# OR use the interactive setup:
+bash skills/plane/scripts/plane_setup.sh
 ```
 
 ### Running Scripts
@@ -113,7 +124,7 @@ def main() -> None:
 
 ### Shared Components (`plane_client.py`)
 
-- **`get_client()`**: Returns `(PlaneClient, workspace_slug)` tuple; validates env vars; exits with error code 1 if config missing
+- **`get_client()`**: Returns `(PlaneClient, workspace_slug)` tuple; reads from `~/.planerc` and `CWD/.planerc` (JSON); exits with error code 1 if config missing
 - **`dump_json(data)`**: Pretty-prints Pydantic models or dicts as JSON
 - **`json_serial(obj)`**: Handles Pydantic model serialization
 
@@ -156,7 +167,7 @@ Tests in `tests/test_smoke.py` verify:
 - All modules can be imported
 - All scripts handle `--help` correctly
 - Argument parsing works for key commands
-- Client helper validates missing env vars
+- Client helper validates missing .planerc config
 - SKILL.md has valid YAML frontmatter
 
 **No live API calls are made during tests.**

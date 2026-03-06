@@ -1,3 +1,5 @@
+.omc
+
 # Virtual environment
 .venv/
 artifacts/
@@ -17,7 +19,7 @@ build/
 .vscode/
 .idea/
 .env
-**/.plane.env
+**/.planerc
 plans
 
 # OS

@@ -84,18 +84,38 @@ class TestHelp:
 class TestClientHelper:
     """Test the plane_client helper module."""
 
-    def test_get_client_missing_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """get_client() should exit with error when env vars are missing."""
-        monkeypatch.delenv("PLANE_API_KEY", raising=False)
-        monkeypatch.delenv("PLANE_ACCESS_TOKEN", raising=False)
-        monkeypatch.delenv("PLANE_WORKSPACE_SLUG", raising=False)
-
+    def test_get_client_missing_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """get_client() should exit with error when no .planerc exists."""
         from scripts import plane_client
 
-        monkeypatch.setattr(plane_client, "_load_plane_env", lambda: None)
+        monkeypatch.setattr(plane_client, "_load_planerc_config", lambda: {})
 
         with pytest.raises(SystemExit):
             plane_client.get_client()
+
+    def test_planerc_merge_override(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        """Project-local .planerc fields override global, non-overridden fields survive."""
+        from scripts import plane_client
+
+        # Create global config
+        global_home = tmp_path / "home"
+        global_home.mkdir()
+        global_rc = global_home / ".planerc"
+        global_rc.write_text('{"apiKey": "global-key", "workspace": "global-ws", "baseUrl": "https://global.plane.so/api/v1"}')
+
+        # Create local config that overrides apiKey only
+        local_dir = tmp_path / "project"
+        local_dir.mkdir()
+        local_rc = local_dir / ".planerc"
+        local_rc.write_text('{"apiKey": "local-key"}')
+
+        monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+
+        config = plane_client._load_planerc_config()
+        assert config["apiKey"] == "local-key"
+        assert config["workspace"] == "global-ws"
+        assert config["baseUrl"] == "https://global.plane.so/api/v1"
 
     def test_dump_json(self) -> None:
         from scripts.plane_client import dump_json

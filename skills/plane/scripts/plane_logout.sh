@@ -3,15 +3,8 @@
 # Usage: bash scripts/plane_logout.sh --confirm
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_DIR="$(dirname "$SCRIPT_DIR")"
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-DEFAULT_ENV_FILE="$PROJECT_DIR/.plane.env"
-ENV_FILE="${PLANE_ENV_FILE:-$DEFAULT_ENV_FILE}"
-if [[ "$ENV_FILE" != /* ]]; then
-  ENV_FILE="$PROJECT_DIR/$ENV_FILE"
-fi
-LEGACY_ENV_FILE="$SKILL_DIR/.plane.env"
+GLOBAL_RC="$HOME/.planerc"
+LOCAL_RC="$(pwd)/.planerc"
 
 if [ -t 1 ]; then
   GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -29,13 +22,10 @@ usage() {
 Usage: bash scripts/plane_logout.sh [--confirm]
 
 Removes saved Plane credentials from:
-  - $ENV_FILE
-  - $LEGACY_ENV_FILE (legacy location, if present)
+  - $GLOBAL_RC (global config — affects ALL projects)
+  - $LOCAL_RC (project-local config)
 
-Notes:
-  - This cannot unset variables in your parent shell process.
-  - After running, also execute:
-      unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
+WARNING: Removing ~/.planerc will affect all projects using that config.
 EOF
 }
 
@@ -53,22 +43,18 @@ if [ "$confirm" != true ]; then
 fi
 
 removed_any=false
-if [ -f "$ENV_FILE" ]; then
-  rm -f "$ENV_FILE"
-  ok "Removed $ENV_FILE"
+if [ -f "$GLOBAL_RC" ]; then
+  rm -f "$GLOBAL_RC"
+  ok "Removed $GLOBAL_RC"
   removed_any=true
 fi
 
-if [ -f "$LEGACY_ENV_FILE" ] && [ "$LEGACY_ENV_FILE" != "$ENV_FILE" ]; then
-  rm -f "$LEGACY_ENV_FILE"
-  ok "Removed legacy file $LEGACY_ENV_FILE"
+if [ -f "$LOCAL_RC" ]; then
+  rm -f "$LOCAL_RC"
+  ok "Removed $LOCAL_RC"
   removed_any=true
 fi
 
 if [ "$removed_any" = false ]; then
-  warn "No .plane.env file found in expected locations."
+  warn "No .planerc file found in expected locations."
 fi
-
-echo ""
-info "To clear current shell variables, run:"
-echo "unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE"
