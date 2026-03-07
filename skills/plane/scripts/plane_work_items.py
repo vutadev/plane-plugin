@@ -27,7 +27,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id, _load_planerc_config
+from scripts.plane_client import get_client, dump_json, resolve_project_id, parse_identifier, _load_planerc_config
 
 
 def cmd_list(args: argparse.Namespace) -> None:
@@ -68,8 +68,19 @@ def cmd_get(args: argparse.Namespace) -> None:
 
 def cmd_get_by_id(args: argparse.Namespace) -> None:
     client, slug = get_client()
+    if args.identifier:
+        project_identifier, sequence = parse_identifier(args.identifier)
+    elif args.project_identifier and args.sequence:
+        project_identifier = args.project_identifier
+        sequence = int(args.sequence)
+    else:
+        print(
+            "ERROR: Provide --identifier PROJECT-123 or both --project-identifier and --sequence.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     work_item = client.work_items.retrieve_by_identifier(
-        slug, args.project_identifier, int(args.sequence)
+        slug, project_identifier, sequence
     )
     print(dump_json(work_item.model_dump()))
 
@@ -153,8 +164,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # get-by-id
     p_get_by_id = sub.add_parser("get-by-id", help="Get work item by identifier")
-    p_get_by_id.add_argument("--project-identifier", required=True, help="Project identifier (e.g. MP)")
-    p_get_by_id.add_argument("--sequence", required=True, help="Issue sequence number")
+    p_get_by_id.add_argument("--identifier", help="Combined identifier (e.g. PROJ-123)")
+    p_get_by_id.add_argument("--project-identifier", help="Project identifier (e.g. MP)")
+    p_get_by_id.add_argument("--sequence", help="Issue sequence number")
 
     # update
     p_update = sub.add_parser("update", help="Update a work item")

@@ -114,9 +114,9 @@ def cmd_unarchive(args: argparse.Namespace) -> None:
 def cmd_add_items(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
-    issue_ids = [i.strip() for i in args.issue_ids.split(",")]
-    client.modules.add_work_items(slug, project_id, args.module_id, issue_ids)
-    print(dump_json({"status": "added", "module_id": args.module_id, "issue_ids": issue_ids}))
+    work_item_ids = [i.strip() for i in args.work_item_ids.split(",")]
+    client.modules.add_work_items(slug, project_id, args.module_id, work_item_ids)
+    print(dump_json({"status": "added", "module_id": args.module_id, "work_item_ids": work_item_ids}))
 
 
 def cmd_remove_item(args: argparse.Namespace) -> None:
@@ -188,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_add = sub.add_parser("add-items", help="Add work items to a module")
     p_add.add_argument("--project-id", default=None, help="Project UUID")
     p_add.add_argument("--module-id", required=True, help="Module UUID")
-    p_add.add_argument("--issue-ids", required=True, help="Comma-separated work item UUIDs")
+    p_add.add_argument("--work-item-ids", required=True, help="Comma-separated work item UUIDs")
 
     # remove-item
     p_remove = sub.add_parser("remove-item", help="Remove a work item from a module")

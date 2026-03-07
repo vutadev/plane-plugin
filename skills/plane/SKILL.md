@@ -150,20 +150,53 @@ All scripts output JSON. Use `--help` for full argument details.
 
 → Full args: `references/api-extended.md`
 
-### Work Item Sub-resources
+### Work Item Sub-resources (`plane_work_item_extras.py`)
 
 ```bash
 $PYTHON scripts/plane_work_item_extras.py <resource> <action> [args]
 ```
 
-Resources: `activities` `comments` `links` `relations` `work-logs` `types`
+**Comments** — add notes, updates, discussion to a work item:
+```bash
+# List comments
+$PYTHON scripts/plane_work_item_extras.py comments list --work-item-id <wid>
+# Add a comment
+$PYTHON scripts/plane_work_item_extras.py comments create --work-item-id <wid> --body "<p>Investigating root cause</p>"
+```
+
+**Links** — attach external URLs (PRs, docs, designs):
+```bash
+$PYTHON scripts/plane_work_item_extras.py links create --work-item-id <wid> --url "https://github.com/..." --title "PR #42"
+```
+
+**Relations** — link work items (blocks, blocked_by, relates_to, duplicate):
+```bash
+$PYTHON scripts/plane_work_item_extras.py relations create --work-item-id <wid> --related-id <other-wid> --relation-type blocks
+```
+
+**Work Logs** — track time spent:
+```bash
+$PYTHON scripts/plane_work_item_extras.py work-logs create --work-item-id <wid> --duration 120 --description "Debug session"
+```
+
+**Activities** — view change history:
+```bash
+$PYTHON scripts/plane_work_item_extras.py activities list --work-item-id <wid>
+```
+
+**Types** — manage custom work item types:
+```bash
+$PYTHON scripts/plane_work_item_extras.py types list
+```
+
+Note: examples omit `--project-id` since it's resolved from `.planerc` when `project_id` is configured.
 
 → Full args: `references/api-work-item-extras.md`
 
 ## Quick Tips
 
 - Pipe output to `jq`: `$PYTHON scripts/plane_projects.py list | jq '.[0].id'`
-- Get item by human ID: `$PYTHON scripts/plane_work_items.py get-by-id --project-identifier MP --sequence 42`
+- Get item by human ID: `$PYTHON scripts/plane_work_items.py get-by-id --identifier MP-42`
 - Bulk operations: comma-separated IDs — `--issue-ids "id1,id2,id3"`
 
 ## References

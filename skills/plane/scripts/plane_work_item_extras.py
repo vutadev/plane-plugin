@@ -187,7 +187,8 @@ def relations_create(args: argparse.Namespace) -> None:
     from plane.models.work_items import CreateWorkItemRelation
 
     payload = CreateWorkItemRelation(
-        related_list=[{"issue": args.related_id, "relation_type": args.relation_type}]
+        relation_type=args.relation_type,
+        issues=[args.related_id],
     )
     client.work_items.relations.create(
         slug, project_id, args.work_item_id, payload

@@ -7,6 +7,7 @@ a ready-to-use (PlaneClient, workspace_slug) tuple.
 Config resolution:
     1) ~/.planerc (global config)
     2) $CLAUDE_PROJECT_DIR/.planerc (project-local override, field-level merge)
+    3) If CLAUDE_PROJECT_DIR is unset, walk up from script dir to find .planerc (stops at git root)
 
 Supported formats (auto-detected):
     KEY=VALUE (like .envrc/.npmrc):
@@ -84,7 +85,19 @@ def _load_planerc_config() -> dict:
 
     # CLAUDE_PROJECT_DIR points to the actual project root when run as a skill
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
-    project_path = Path(project_dir) / ".planerc" if project_dir else None
+    project_path: Path | None = None
+    if project_dir:
+        project_path = Path(project_dir) / ".planerc"
+    else:
+        # Walk up from script directory to find .planerc (stop at git root or fs root)
+        script_dir = Path(__file__).resolve().parent
+        for ancestor in [script_dir, *script_dir.parents]:
+            candidate = ancestor / ".planerc"
+            if candidate.is_file():
+                project_path = candidate
+                break
+            if (ancestor / ".git").exists():
+                break
 
     candidates = [global_path]
     if project_path:
@@ -169,6 +182,27 @@ def resolve_project_id(args: argparse.Namespace) -> str:
         file=sys.stderr,
     )
     sys.exit(1)
+
+
+def parse_identifier(identifier: str) -> tuple[str, int]:
+    """Parse 'PROJECT-123' into ('PROJECT', 123). Splits on last '-'."""
+    sep_index = identifier.rfind("-")
+    if sep_index <= 0:
+        print(
+            f"ERROR: Invalid identifier format '{identifier}'. Expected 'PROJECT-123'.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    project_part = identifier[:sep_index]
+    try:
+        sequence = int(identifier[sep_index + 1 :])
+    except ValueError:
+        print(
+            f"ERROR: Invalid sequence number in '{identifier}'. Expected 'PROJECT-123'.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return project_part, sequence
 
 
 def json_serial(obj: object) -> str:
