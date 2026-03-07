@@ -4,8 +4,8 @@
 |-------|-------|-----|
 | `python: command not found` | No `python` binary | Use `python3` or `PYTHON=$(command -v python3)` |
 | `ModuleNotFoundError: No module named 'plane'` | SDK not installed | `pip install -r requirements.txt` (or `pip3`, or `$PYTHON -m pip`) |
-| `'apiKey' or 'accessToken' must be set in .planerc` | Missing auth in config | Create `~/.planerc` with `{"apiKey": "your-key", "workspace": "..."}` — get key from Plane → Settings → API Tokens |
-| `'workspace' must be set in .planerc` | Missing workspace in config | Add `"workspace": "slug"` to `.planerc` — find slug in your Plane URL |
+| `'api_key' or 'access_token' must be set in .planerc` | Missing auth in config | Create `~/.planerc` with `api_key=your-key` — get key from Plane → Settings → API Tokens |
+| `'workspace' must be set in .planerc` | Missing workspace in config | Add `workspace=slug` to `.planerc` — find slug in your Plane URL |
 | `Failed to get current user` / 401 | Invalid/expired token | Regenerate token in Plane → Settings → API Tokens |
 | `Failed to list projects` / 404 | Wrong slug or base URL | Verify `workspace` in `.planerc`; check `baseUrl` for self-hosted |
 | `Failed to parse ~/.planerc` | Malformed JSON | Validate JSON syntax (check for trailing commas, missing quotes) |
@@ -19,27 +19,24 @@ bash scripts/plane_setup.sh
 # Or create .planerc manually:
 # Global config (all projects):
 cat > ~/.planerc << 'EOF'
-{
-  "apiKey": "plane-api-key-here",
-  "workspace": "my-workspace",
-  "baseUrl": "https://api.plane.so/api/v1"
-}
+# Plane API Configuration
+api_key=plane-api-key-here
+workspace=my-workspace
+base_url=https://api.plane.so
 EOF
 chmod 600 ~/.planerc
 
 # Or project-local config (overrides global):
 cat > .planerc << 'EOF'
-{
-  "apiKey": "plane-api-key-here",
-  "workspace": "my-workspace"
-}
+api_key=plane-api-key-here
+workspace=my-workspace
 EOF
 chmod 600 .planerc
 ```
 
 - API key: Plane → Settings → API Tokens → Create new token
 - Workspace slug: in your Plane URL `https://app.plane.so/<workspace-slug>/...`
-- Config format: JSON with fields `apiKey`, `workspace`, `baseUrl` (optional `accessToken` as alternative to `apiKey`)
+- Config format: KEY=VALUE (like .envrc/.npmrc) with fields `api_key`, `workspace`, `base_url` (optional `access_token` as alternative to `api_key`). JSON format also supported for TS CLI compatibility.
 
 ## Pre-flight Check
 

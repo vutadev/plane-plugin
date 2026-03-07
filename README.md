@@ -74,14 +74,16 @@ View current config:
 plane-cli config show
 ```
 
-### Environment Variables (both CLI and Python scripts)
+### Python Scripts Config (.planerc)
 
-Environment variables override config file values:
+Python scripts read from `~/.planerc` (global) and `./.planerc` (project override).
+Supports KEY=VALUE format (recommended) or JSON:
 
 ```bash
-export PLANE_API_KEY="your-api-key"           # OR PLANE_ACCESS_TOKEN
-export PLANE_WORKSPACE_SLUG="your-workspace"
-export PLANE_BASE_URL="https://api.plane.so/api/v1"  # Optional (default shown)
+# ~/.planerc (KEY=VALUE format)
+api_key=your-api-key
+workspace=your-workspace
+base_url=https://api.plane.so
 ```
 
 ### Python Scripts Setup
@@ -234,7 +236,6 @@ rm ~/.planerc
 
 # Python scripts
 bash skills/plane/scripts/plane_logout.sh --confirm
-unset PLANE_API_KEY PLANE_ACCESS_TOKEN PLANE_WORKSPACE_SLUG PLANE_BASE_URL PLANE_ENV_FILE
 ```
 
 ## Directory Structure

@@ -28,14 +28,21 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json
+from scripts.plane_client import get_client, dump_json, resolve_project_id, _load_planerc_config
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     client, slug = get_client()
-    response = client.projects.list(slug)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
+    config = _load_planerc_config()
+    default_pid = config.get("project_id") or config.get("default_project_id")
+    if default_pid:
+        # Restricted to a single project
+        project = client.projects.retrieve(slug, default_pid)
+        data = [project.model_dump() if hasattr(project, "model_dump") else project]
+    else:
+        response = client.projects.list(slug)
+        results = response.results if hasattr(response, "results") else response
+        data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
@@ -54,12 +61,14 @@ def cmd_create(args: argparse.Namespace) -> None:
 
 
 def cmd_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    project = client.projects.retrieve(slug, args.project_id)
+    project = client.projects.retrieve(slug, project_id)
     print(dump_json(project.model_dump()))
 
 
 def cmd_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.projects import UpdateProject
 
@@ -76,11 +85,12 @@ def cmd_update(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     payload = UpdateProject(**fields)
-    project = client.projects.update(slug, args.project_id, payload)
+    project = client.projects.update(slug, project_id, payload)
     print(dump_json(project.model_dump()))
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     if not args.confirm:
         print(
             "ERROR: Destructive operation — pass --confirm to proceed.",
@@ -88,20 +98,22 @@ def cmd_delete(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
     client, slug = get_client()
-    client.projects.delete(slug, args.project_id)
-    print(dump_json({"status": "deleted", "project_id": args.project_id}))
+    client.projects.delete(slug, project_id)
+    print(dump_json({"status": "deleted", "project_id": project_id}))
 
 
 def cmd_members(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    members = client.projects.get_members(slug, args.project_id)
+    members = client.projects.get_members(slug, project_id)
     data = [m.model_dump() if hasattr(m, "model_dump") else m for m in members]
     print(dump_json(data))
 
 
 def cmd_features(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    features = client.projects.get_features(slug, args.project_id)
+    features = client.projects.get_features(slug, project_id)
     print(dump_json(features.model_dump()))
 
 
@@ -124,27 +136,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     # get
     p_get = sub.add_parser("get", help="Get project by ID")
-    p_get.add_argument("--project-id", required=True, help="Project UUID")
+    p_get.add_argument("--project-id", default=None, help="Project UUID")
 
     # update
     p_update = sub.add_parser("update", help="Update a project")
-    p_update.add_argument("--project-id", required=True, help="Project UUID")
+    p_update.add_argument("--project-id", default=None, help="Project UUID")
     p_update.add_argument("--name", help="New project name")
     p_update.add_argument("--description", help="New description")
     p_update.add_argument("--identifier", help="New identifier")
 
     # delete
     p_delete = sub.add_parser("delete", help="Delete a project (requires --confirm)")
-    p_delete.add_argument("--project-id", required=True, help="Project UUID")
+    p_delete.add_argument("--project-id", default=None, help="Project UUID")
     p_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
 
     # members
     p_members = sub.add_parser("members", help="List project members")
-    p_members.add_argument("--project-id", required=True, help="Project UUID")
+    p_members.add_argument("--project-id", default=None, help="Project UUID")
 
     # features
     p_features = sub.add_parser("features", help="Get project features")
-    p_features.add_argument("--project-id", required=True, help="Project UUID")
+    p_features.add_argument("--project-id", default=None, help="Project UUID")
 
     return parser
 

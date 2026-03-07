@@ -17,18 +17,20 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json
+from scripts.plane_client import get_client, dump_json, resolve_project_id
 
 
 def cmd_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.labels.list(slug, args.project_id)
+    response = client.labels.list(slug, project_id)
     results = response.results if hasattr(response, "results") else response
     data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
 def cmd_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.labels import CreateLabel
 
@@ -37,17 +39,19 @@ def cmd_create(args: argparse.Namespace) -> None:
         fields["color"] = args.color
 
     payload = CreateLabel(**fields)
-    label = client.labels.create(slug, args.project_id, payload)
+    label = client.labels.create(slug, project_id, payload)
     print(dump_json(label.model_dump()))
 
 
 def cmd_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    label = client.labels.retrieve(slug, args.project_id, args.label_id)
+    label = client.labels.retrieve(slug, project_id, args.label_id)
     print(dump_json(label.model_dump()))
 
 
 def cmd_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.labels import UpdateLabel
 
@@ -62,16 +66,17 @@ def cmd_update(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     payload = UpdateLabel(**fields)
-    label = client.labels.update(slug, args.project_id, args.label_id, payload)
+    label = client.labels.update(slug, project_id, args.label_id, payload)
     print(dump_json(label.model_dump()))
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
     client, slug = get_client()
-    client.labels.delete(slug, args.project_id, args.label_id)
+    client.labels.delete(slug, project_id, args.label_id)
     print(dump_json({"status": "deleted", "label_id": args.label_id}))
 
 
@@ -83,25 +88,25 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_list = sub.add_parser("list", help="List labels")
-    p_list.add_argument("--project-id", required=True, help="Project UUID")
+    p_list.add_argument("--project-id", default=None, help="Project UUID")
 
     p_create = sub.add_parser("create", help="Create a label")
-    p_create.add_argument("--project-id", required=True, help="Project UUID")
+    p_create.add_argument("--project-id", default=None, help="Project UUID")
     p_create.add_argument("--name", required=True, help="Label name")
     p_create.add_argument("--color", help="Label color (hex, e.g. #ff0000)")
 
     p_get = sub.add_parser("get", help="Get label by ID")
-    p_get.add_argument("--project-id", required=True, help="Project UUID")
+    p_get.add_argument("--project-id", default=None, help="Project UUID")
     p_get.add_argument("--label-id", required=True, help="Label UUID")
 
     p_update = sub.add_parser("update", help="Update a label")
-    p_update.add_argument("--project-id", required=True, help="Project UUID")
+    p_update.add_argument("--project-id", default=None, help="Project UUID")
     p_update.add_argument("--label-id", required=True, help="Label UUID")
     p_update.add_argument("--name", help="New name")
     p_update.add_argument("--color", help="New color")
 
     p_delete = sub.add_parser("delete", help="Delete a label (requires --confirm)")
-    p_delete.add_argument("--project-id", required=True, help="Project UUID")
+    p_delete.add_argument("--project-id", default=None, help="Project UUID")
     p_delete.add_argument("--label-id", required=True, help="Label UUID")
     p_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
 

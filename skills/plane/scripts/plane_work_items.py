@@ -27,18 +27,20 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json
+from scripts.plane_client import get_client, dump_json, resolve_project_id, _load_planerc_config
 
 
 def cmd_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.work_items.list(slug, args.project_id)
+    response = client.work_items.list(slug, project_id)
     results = response.results if hasattr(response, "results") else response
     data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
 def cmd_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import CreateWorkItem
 
@@ -53,13 +55,14 @@ def cmd_create(args: argparse.Namespace) -> None:
         fields["assignees"] = args.assignees.split(",")
 
     payload = CreateWorkItem(**fields)
-    work_item = client.work_items.create(slug, args.project_id, payload)
+    work_item = client.work_items.create(slug, project_id, payload)
     print(dump_json(work_item.model_dump()))
 
 
 def cmd_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    work_item = client.work_items.retrieve(slug, args.project_id, args.work_item_id)
+    work_item = client.work_items.retrieve(slug, project_id, args.work_item_id)
     print(dump_json(work_item.model_dump()))
 
 
@@ -72,6 +75,7 @@ def cmd_get_by_id(args: argparse.Namespace) -> None:
 
 
 def cmd_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import UpdateWorkItem
 
@@ -91,12 +95,20 @@ def cmd_update(args: argparse.Namespace) -> None:
 
     payload = UpdateWorkItem(**fields)
     work_item = client.work_items.update(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json(work_item.model_dump()))
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
+    config = _load_planerc_config()
+    if str(config.get("disable_delete_issue", "")).lower() in ("true", "1"):
+        print(
+            "ERROR: Work item deletion is disabled via 'disable_delete_issue' in .planerc.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    project_id = resolve_project_id(args)
     if not args.confirm:
         print(
             "ERROR: Destructive operation — pass --confirm to proceed.",
@@ -104,7 +116,7 @@ def cmd_delete(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
     client, slug = get_client()
-    client.work_items.delete(slug, args.project_id, args.work_item_id)
+    client.work_items.delete(slug, project_id, args.work_item_id)
     print(dump_json({"status": "deleted", "work_item_id": args.work_item_id}))
 
 
@@ -123,11 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # list
     p_list = sub.add_parser("list", help="List work items in a project")
-    p_list.add_argument("--project-id", required=True, help="Project UUID")
+    p_list.add_argument("--project-id", default=None, help="Project UUID")
 
     # create
     p_create = sub.add_parser("create", help="Create a new work item")
-    p_create.add_argument("--project-id", required=True, help="Project UUID")
+    p_create.add_argument("--project-id", default=None, help="Project UUID")
     p_create.add_argument("--name", required=True, help="Work item name")
     p_create.add_argument("--description", help="Description (HTML)")
     p_create.add_argument("--priority", help="Priority: urgent|high|medium|low|none")
@@ -136,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # get
     p_get = sub.add_parser("get", help="Get work item by UUID")
-    p_get.add_argument("--project-id", required=True, help="Project UUID")
+    p_get.add_argument("--project-id", default=None, help="Project UUID")
     p_get.add_argument("--work-item-id", required=True, help="Work item UUID")
 
     # get-by-id
@@ -146,7 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # update
     p_update = sub.add_parser("update", help="Update a work item")
-    p_update.add_argument("--project-id", required=True, help="Project UUID")
+    p_update.add_argument("--project-id", default=None, help="Project UUID")
     p_update.add_argument("--work-item-id", required=True, help="Work item UUID")
     p_update.add_argument("--name", help="New name")
     p_update.add_argument("--description", help="New description (HTML)")
@@ -155,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # delete
     p_delete = sub.add_parser("delete", help="Delete a work item (requires --confirm)")
-    p_delete.add_argument("--project-id", required=True, help="Project UUID")
+    p_delete.add_argument("--project-id", default=None, help="Project UUID")
     p_delete.add_argument("--work-item-id", required=True, help="Work item UUID")
     p_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
 

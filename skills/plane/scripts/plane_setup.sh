@@ -78,7 +78,7 @@ fi
 echo ""
 info "Checking Plane configuration..."
 
-# Check existing configs for required fields
+# Check existing configs for required fields (supports both KEY=VALUE and JSON)
 needs_setup=true
 existing_config=""
 if [ -f "$LOCAL_RC" ]; then
@@ -88,12 +88,24 @@ elif [ -f "$GLOBAL_RC" ]; then
 fi
 
 if [ -n "$existing_config" ]; then
-  if "$PYTHON" -c "
-import json, sys
-with open('$existing_config') as f:
-    c = json.load(f)
-if c.get('apiKey') or c.get('accessToken'):
-    if c.get('workspace'):
+  if PLANERC_PATH="$existing_config" "$PYTHON" -c "
+import os, sys
+path = os.environ['PLANERC_PATH']
+text = open(path).read().strip()
+config = {}
+if text.startswith('{'):
+    import json
+    config = json.loads(text)
+else:
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' in line:
+            k, _, v = line.partition('=')
+            config[k.strip()] = v.strip()
+if config.get('api_key') or config.get('access_token') or config.get('apiKey') or config.get('accessToken'):
+    if config.get('workspace'):
         sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
@@ -105,7 +117,7 @@ fi
 if [ "$needs_setup" = true ]; then
   if [ ! -t 0 ]; then
     err ".planerc not configured and stdin is not interactive."
-    err "Create ~/.planerc or ./.planerc with: {\"apiKey\": \"...\", \"workspace\": \"...\"}"
+    err "Create ~/.planerc or ./.planerc with: api_key=... and workspace=..."
     exit 1
   fi
 
@@ -141,19 +153,22 @@ if [ "$needs_setup" = true ]; then
   fi
 
   # Base URL
-  read -rp "Base URL [https://api.plane.so/api/v1]: " base_url
-  base_url="${base_url:-https://api.plane.so/api/v1}"
+  read -rp "Base URL [https://api.plane.so]: " base_url
+  base_url="${base_url:-https://api.plane.so}"
 
-  # Write JSON config with 0o600 permissions (pass values via env vars to avoid injection)
+  # Write KEY=VALUE config with 0o600 permissions (pass values via env vars to avoid injection)
   API_KEY="$api_key" WORKSPACE="$workspace_slug" BASE_URL="$base_url" TARGET_RC="$RC_FILE" \
     "$PYTHON" -c "
-import json, os
-config = {'apiKey': os.environ['API_KEY'], 'workspace': os.environ['WORKSPACE'], 'baseUrl': os.environ['BASE_URL']}
+import os
 path = os.environ['TARGET_RC']
-os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+parent = os.path.dirname(path)
+if parent:
+    os.makedirs(parent, exist_ok=True)
 with open(path, 'w') as f:
-    json.dump(config, f, indent=2)
-    f.write('\n')
+    f.write('# Plane API Configuration\n')
+    f.write(f\"api_key={os.environ['API_KEY']}\n\")
+    f.write(f\"workspace={os.environ['WORKSPACE']}\n\")
+    f.write(f\"base_url={os.environ['BASE_URL']}\n\")
 os.chmod(path, 0o600)
 "
 

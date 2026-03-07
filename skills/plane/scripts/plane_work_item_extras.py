@@ -23,23 +23,25 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json
+from scripts.plane_client import get_client, dump_json, resolve_project_id
 
 
 # ── Activities ────────────────────────────────────────────────────────────────
 
 def activities_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.work_items.activities.list(slug, args.project_id, args.work_item_id)
+    response = client.work_items.activities.list(slug, project_id, args.work_item_id)
     results = response.results if hasattr(response, "results") else response
     data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
 def activities_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     activity = client.work_items.activities.retrieve(
-        slug, args.project_id, args.work_item_id, args.activity_id
+        slug, project_id, args.work_item_id, args.activity_id
     )
     print(dump_json(activity.model_dump()))
 
@@ -47,39 +49,43 @@ def activities_get(args: argparse.Namespace) -> None:
 # ── Comments ──────────────────────────────────────────────────────────────────
 
 def comments_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.work_items.comments.list(slug, args.project_id, args.work_item_id)
+    response = client.work_items.comments.list(slug, project_id, args.work_item_id)
     results = response.results if hasattr(response, "results") else response
     data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
 def comments_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     comment = client.work_items.comments.retrieve(
-        slug, args.project_id, args.work_item_id, args.comment_id
+        slug, project_id, args.work_item_id, args.comment_id
     )
     print(dump_json(comment.model_dump()))
 
 
 def comments_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import CreateWorkItemComment
 
     payload = CreateWorkItemComment(comment_html=args.body)
     comment = client.work_items.comments.create(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json(comment.model_dump()))
 
 
 def comments_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import UpdateWorkItemComment
 
     payload = UpdateWorkItemComment(comment_html=args.body)
     comment = client.work_items.comments.update(
-        slug, args.project_id, args.work_item_id, args.comment_id, payload
+        slug, project_id, args.work_item_id, args.comment_id, payload
     )
     print(dump_json(comment.model_dump()))
 
@@ -88,9 +94,10 @@ def comments_delete(args: argparse.Namespace) -> None:
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.comments.delete(
-        slug, args.project_id, args.work_item_id, args.comment_id
+        slug, project_id, args.work_item_id, args.comment_id
     )
     print(dump_json({"status": "deleted", "comment_id": args.comment_id}))
 
@@ -98,22 +105,25 @@ def comments_delete(args: argparse.Namespace) -> None:
 # ── Links ─────────────────────────────────────────────────────────────────────
 
 def links_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.work_items.links.list(slug, args.project_id, args.work_item_id)
+    response = client.work_items.links.list(slug, project_id, args.work_item_id)
     results = response.results if hasattr(response, "results") else response
     data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
     print(dump_json(data))
 
 
 def links_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     link = client.work_items.links.retrieve(
-        slug, args.project_id, args.work_item_id, args.link_id
+        slug, project_id, args.work_item_id, args.link_id
     )
     print(dump_json(link.model_dump()))
 
 
 def links_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import CreateWorkItemLink
 
@@ -123,12 +133,13 @@ def links_create(args: argparse.Namespace) -> None:
 
     payload = CreateWorkItemLink(**fields)
     link = client.work_items.links.create(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json(link.model_dump()))
 
 
 def links_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import UpdateWorkItemLink
 
@@ -144,7 +155,7 @@ def links_update(args: argparse.Namespace) -> None:
 
     payload = UpdateWorkItemLink(**fields)
     link = client.work_items.links.update(
-        slug, args.project_id, args.work_item_id, args.link_id, payload
+        slug, project_id, args.work_item_id, args.link_id, payload
     )
     print(dump_json(link.model_dump()))
 
@@ -153,9 +164,10 @@ def links_delete(args: argparse.Namespace) -> None:
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.links.delete(
-        slug, args.project_id, args.work_item_id, args.link_id
+        slug, project_id, args.work_item_id, args.link_id
     )
     print(dump_json({"status": "deleted", "link_id": args.link_id}))
 
@@ -163,12 +175,14 @@ def links_delete(args: argparse.Namespace) -> None:
 # ── Relations ─────────────────────────────────────────────────────────────────
 
 def relations_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    response = client.work_items.relations.list(slug, args.project_id, args.work_item_id)
+    response = client.work_items.relations.list(slug, project_id, args.work_item_id)
     print(dump_json(response.model_dump() if hasattr(response, "model_dump") else response))
 
 
 def relations_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import CreateWorkItemRelation
 
@@ -176,7 +190,7 @@ def relations_create(args: argparse.Namespace) -> None:
         related_list=[{"issue": args.related_id, "relation_type": args.relation_type}]
     )
     client.work_items.relations.create(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json({
         "status": "created",
@@ -190,6 +204,7 @@ def relations_delete(args: argparse.Namespace) -> None:
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import RemoveWorkItemRelation
 
@@ -198,7 +213,7 @@ def relations_delete(args: argparse.Namespace) -> None:
         relation_type=args.relation_type,
     )
     client.work_items.relations.delete(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json({"status": "deleted", "related_id": args.related_id}))
 
@@ -206,24 +221,27 @@ def relations_delete(args: argparse.Namespace) -> None:
 # ── Work Logs ─────────────────────────────────────────────────────────────────
 
 def work_logs_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    logs = client.work_items.work_logs.list(slug, args.project_id, args.work_item_id)
+    logs = client.work_items.work_logs.list(slug, project_id, args.work_item_id)
     data = [l.model_dump() if hasattr(l, "model_dump") else l for l in logs]
     print(dump_json(data))
 
 
 def work_logs_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     payload = {"duration": int(args.duration)}
     if args.description:
         payload["description"] = args.description
     log = client.work_items.work_logs.create(
-        slug, args.project_id, args.work_item_id, payload
+        slug, project_id, args.work_item_id, payload
     )
     print(dump_json(log.model_dump()))
 
 
 def work_logs_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     fields: dict = {}
     if args.duration:
@@ -236,7 +254,7 @@ def work_logs_update(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     log = client.work_items.work_logs.update(
-        slug, args.project_id, args.work_item_id, args.work_log_id, fields
+        slug, project_id, args.work_item_id, args.work_log_id, fields
     )
     print(dump_json(log.model_dump()))
 
@@ -245,9 +263,10 @@ def work_logs_delete(args: argparse.Namespace) -> None:
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.work_logs.delete(
-        slug, args.project_id, args.work_item_id, args.work_log_id
+        slug, project_id, args.work_item_id, args.work_log_id
     )
     print(dump_json({"status": "deleted", "work_log_id": args.work_log_id}))
 
@@ -255,19 +274,22 @@ def work_logs_delete(args: argparse.Namespace) -> None:
 # ── Work Item Types ───────────────────────────────────────────────────────────
 
 def types_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    types = client.work_item_types.list(slug, args.project_id)
+    types = client.work_item_types.list(slug, project_id)
     data = [t.model_dump() if hasattr(t, "model_dump") else t for t in types]
     print(dump_json(data))
 
 
 def types_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    t = client.work_item_types.retrieve(slug, args.project_id, args.type_id)
+    t = client.work_item_types.retrieve(slug, project_id, args.type_id)
     print(dump_json(t.model_dump()))
 
 
 def types_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_item_types import CreateWorkItemType
 
@@ -276,11 +298,12 @@ def types_create(args: argparse.Namespace) -> None:
         fields["description"] = args.description
 
     payload = CreateWorkItemType(**fields)
-    t = client.work_item_types.create(slug, args.project_id, payload)
+    t = client.work_item_types.create(slug, project_id, payload)
     print(dump_json(t.model_dump()))
 
 
 def types_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_item_types import UpdateWorkItemType
 
@@ -295,7 +318,7 @@ def types_update(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     payload = UpdateWorkItemType(**fields)
-    t = client.work_item_types.update(slug, args.project_id, args.type_id, payload)
+    t = client.work_item_types.update(slug, project_id, args.type_id, payload)
     print(dump_json(t.model_dump()))
 
 
@@ -303,8 +326,9 @@ def types_delete(args: argparse.Namespace) -> None:
     if not args.confirm:
         print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
         sys.exit(1)
+    project_id = resolve_project_id(args)
     client, slug = get_client()
-    client.work_item_types.delete(slug, args.project_id, args.type_id)
+    client.work_item_types.delete(slug, project_id, args.type_id)
     print(dump_json({"status": "deleted", "type_id": args.type_id}))
 
 
@@ -312,7 +336,7 @@ def types_delete(args: argparse.Namespace) -> None:
 
 def _add_wi_args(p: argparse.ArgumentParser) -> None:
     """Add common --project-id and --work-item-id args."""
-    p.add_argument("--project-id", required=True, help="Project UUID")
+    p.add_argument("--project-id", default=None, help="Project UUID")
     p.add_argument("--work-item-id", required=True, help="Work item UUID")
 
 
@@ -433,25 +457,25 @@ def build_parser() -> argparse.ArgumentParser:
     typ_sub = p_typ.add_subparsers(dest="action", required=True)
 
     typ_list = typ_sub.add_parser("list", help="List work item types")
-    typ_list.add_argument("--project-id", required=True, help="Project UUID")
+    typ_list.add_argument("--project-id", default=None, help="Project UUID")
 
     typ_get = typ_sub.add_parser("get", help="Get work item type by ID")
-    typ_get.add_argument("--project-id", required=True, help="Project UUID")
+    typ_get.add_argument("--project-id", default=None, help="Project UUID")
     typ_get.add_argument("--type-id", required=True, help="Work item type UUID")
 
     typ_create = typ_sub.add_parser("create", help="Create a work item type")
-    typ_create.add_argument("--project-id", required=True, help="Project UUID")
+    typ_create.add_argument("--project-id", default=None, help="Project UUID")
     typ_create.add_argument("--name", required=True, help="Type name")
     typ_create.add_argument("--description", help="Description")
 
     typ_update = typ_sub.add_parser("update", help="Update a work item type")
-    typ_update.add_argument("--project-id", required=True, help="Project UUID")
+    typ_update.add_argument("--project-id", default=None, help="Project UUID")
     typ_update.add_argument("--type-id", required=True, help="Work item type UUID")
     typ_update.add_argument("--name", help="New name")
     typ_update.add_argument("--description", help="New description")
 
     typ_delete = typ_sub.add_parser("delete", help="Delete a work item type")
-    typ_delete.add_argument("--project-id", required=True, help="Project UUID")
+    typ_delete.add_argument("--project-id", default=None, help="Project UUID")
     typ_delete.add_argument("--type-id", required=True, help="Work item type UUID")
     typ_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
 

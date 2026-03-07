@@ -13,16 +13,20 @@ This is a **Plane Agent Skill** — a collection of Python CLI scripts for inter
 # Install dependencies
 pip install -r skills/plane/requirements.txt
 
-# Configure credentials via .planerc (JSON format):
+# Configure credentials via .planerc (KEY=VALUE format):
 # Global config (all projects):
 cat > ~/.planerc << 'EOF'
-{"apiKey": "your-api-key", "workspace": "your-workspace", "baseUrl": "https://api.plane.so/api/v1"}
+# Plane API Configuration
+api_key=your-api-key
+workspace=your-workspace
+base_url=https://api.plane.so
 EOF
 chmod 600 ~/.planerc
 
 # OR project-local config (overrides global):
 cat > .planerc << 'EOF'
-{"apiKey": "your-api-key", "workspace": "your-workspace"}
+api_key=your-api-key
+workspace=your-workspace
 EOF
 chmod 600 .planerc
 

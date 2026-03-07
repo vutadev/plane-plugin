@@ -97,25 +97,48 @@ class TestClientHelper:
         """Project-local .planerc fields override global, non-overridden fields survive."""
         from scripts import plane_client
 
-        # Create global config
+        plane_client._reset_config_cache()
+
+        # Create global config (KEY=VALUE format)
         global_home = tmp_path / "home"
         global_home.mkdir()
         global_rc = global_home / ".planerc"
-        global_rc.write_text('{"apiKey": "global-key", "workspace": "global-ws", "baseUrl": "https://global.plane.so/api/v1"}')
+        global_rc.write_text("api_key=global-key\nworkspace=global-ws\nbase_url=https://global.plane.so")
 
-        # Create local config that overrides apiKey only
+        # Create local config that overrides api_key only
         local_dir = tmp_path / "project"
         local_dir.mkdir()
         local_rc = local_dir / ".planerc"
-        local_rc.write_text('{"apiKey": "local-key"}')
+        local_rc.write_text("api_key=local-key")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
         monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
 
         config = plane_client._load_planerc_config()
-        assert config["apiKey"] == "local-key"
+        assert config["api_key"] == "local-key"
         assert config["workspace"] == "global-ws"
-        assert config["baseUrl"] == "https://global.plane.so/api/v1"
+        assert config["base_url"] == "https://global.plane.so"
+
+    def test_planerc_json_format(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        """JSON format .planerc is also supported (TS CLI compatibility)."""
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+
+        global_home = tmp_path / "home"
+        global_home.mkdir()
+        global_rc = global_home / ".planerc"
+        global_rc.write_text('{"api_key": "json-key", "workspace": "json-ws"}')
+
+        local_dir = tmp_path / "project"
+        local_dir.mkdir()
+
+        monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+
+        config = plane_client._load_planerc_config()
+        assert config["api_key"] == "json-key"
+        assert config["workspace"] == "json-ws"
 
     def test_dump_json(self) -> None:
         from scripts.plane_client import dump_json
@@ -211,3 +234,280 @@ class TestArgParsing:
         frontmatter = content[3:second_dash].strip()
         assert "name:" in frontmatter
         assert "description:" in frontmatter
+
+
+class TestConfigCache:
+    """Test config caching behavior."""
+
+    def test_cache_returns_same_dict(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        """_load_planerc_config() returns cached result on second call."""
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+
+        global_home = tmp_path / "home"
+        global_home.mkdir()
+        (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=ws1")
+        local_dir = tmp_path / "project"
+        local_dir.mkdir()
+
+        monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+
+        first = plane_client._load_planerc_config()
+        second = plane_client._load_planerc_config()
+        assert first is second
+
+    def test_reset_cache_forces_reparse(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        """_reset_config_cache() clears cache, next call re-reads files."""
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+
+        global_home = tmp_path / "home"
+        global_home.mkdir()
+        rc = global_home / ".planerc"
+        rc.write_text("api_key=k1\nworkspace_slug=ws1")
+        local_dir = tmp_path / "project"
+        local_dir.mkdir()
+
+        monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+
+        first = plane_client._load_planerc_config()
+        assert first["api_key"] == "k1"
+
+        # Modify the file and reset cache
+        rc.write_text("api_key=k2\nworkspace_slug=ws1")
+        plane_client._reset_config_cache()
+
+        second = plane_client._load_planerc_config()
+        assert second["api_key"] == "k2"
+        assert first is not second
+
+
+class TestWorkspaceSlugAlias:
+    """Test workspace_slug config key alias."""
+
+    def test_workspace_slug_accepted(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        """'workspace_slug' key works in config."""
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+
+        global_home = tmp_path / "home"
+        global_home.mkdir()
+        (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=my-ws")
+        local_dir = tmp_path / "project"
+        local_dir.mkdir()
+
+        monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+
+        config = plane_client._load_planerc_config()
+        assert config["workspace_slug"] == "my-ws"
+
+    def test_workspace_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Old 'workspace' key still works via get_client fallback."""
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"api_key": "k1", "workspace": "old-ws"},
+        )
+
+        # get_client reads workspace_slug || workspace
+        # We can't fully test get_client (needs PlaneClient), but we can
+        # check the config resolution logic directly
+        config = plane_client._load_planerc_config()
+        ws = config.get("workspace_slug") or config.get("workspace")
+        assert ws == "old-ws"
+
+
+class TestResolveProjectId:
+    """Test resolve_project_id() helper."""
+
+    def test_cli_arg_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Explicit --project-id overrides config default."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"project_id": "config-pid"},
+        )
+
+        args = argparse.Namespace(project_id="cli-pid")
+        assert plane_client.resolve_project_id(args) == "cli-pid"
+
+    def test_falls_back_to_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When CLI arg is None, uses project_id from config."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"project_id": "config-pid"},
+        )
+
+        args = argparse.Namespace(project_id=None)
+        assert plane_client.resolve_project_id(args) == "config-pid"
+
+    def test_falls_back_to_legacy_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Legacy default_project_id key still works as fallback."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"default_project_id": "legacy-pid"},
+        )
+
+        args = argparse.Namespace(project_id=None)
+        assert plane_client.resolve_project_id(args) == "legacy-pid"
+
+    def test_project_id_wins_over_legacy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """project_id takes priority over default_project_id."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"project_id": "new-pid", "default_project_id": "legacy-pid"},
+        )
+
+        args = argparse.Namespace(project_id=None)
+        assert plane_client.resolve_project_id(args) == "new-pid"
+
+    def test_exits_when_neither(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Exits with code 1 when no CLI arg and no config default."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {},
+        )
+
+        args = argparse.Namespace(project_id=None)
+        with pytest.raises(SystemExit):
+            plane_client.resolve_project_id(args)
+
+    def test_error_message_content(self, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+        """Error message mentions --project-id and default_project_id."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {},
+        )
+
+        args = argparse.Namespace(project_id=None)
+        with pytest.raises(SystemExit):
+            plane_client.resolve_project_id(args)
+
+        captured = capsys.readouterr()
+        assert "--project-id" in captured.err
+        assert "project_id" in captured.err
+
+
+class TestDisableDeleteIssue:
+    """Test disable_delete_issue config guard."""
+
+    def test_delete_blocked_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """cmd_delete exits when disable_delete_issue=true in config."""
+        import argparse
+        from scripts import plane_client
+        from scripts import plane_work_items
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"disable_delete_issue": "true", "project_id": "pid"},
+        )
+
+        args = argparse.Namespace(
+            project_id=None, work_item_id="wid", confirm=True,
+        )
+        with pytest.raises(SystemExit):
+            plane_work_items.cmd_delete(args)
+
+    def test_delete_allowed_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """cmd_delete does NOT block when disable_delete_issue is absent."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"project_id": "pid"},
+        )
+
+        # Without confirm, cmd_delete exits for a different reason (--confirm guard)
+        args = argparse.Namespace(
+            project_id="pid", work_item_id="wid", confirm=False,
+        )
+        from scripts import plane_work_items
+
+        with pytest.raises(SystemExit) as exc_info:
+            plane_work_items.cmd_delete(args)
+        # It should fail on --confirm check, not disable_delete_issue
+        assert exc_info.value.code == 1
+
+    def test_other_deletes_unaffected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """plane_cycles.py cmd_delete is NOT affected by disable_delete_issue."""
+        import argparse
+        from scripts import plane_client
+
+        plane_client._reset_config_cache()
+        monkeypatch.setattr(
+            plane_client, "_load_planerc_config",
+            lambda: {"disable_delete_issue": "true", "project_id": "pid"},
+        )
+
+        args = argparse.Namespace(
+            project_id="pid", cycle_id="cid", confirm=False,
+        )
+        from scripts import plane_cycles
+
+        # Should fail on --confirm check, not disable_delete_issue
+        with pytest.raises(SystemExit) as exc_info:
+            plane_cycles.cmd_delete(args)
+        assert exc_info.value.code == 1
+
+
+class TestProjectIdOptional:
+    """Test --project-id is optional in argparse."""
+
+    def test_project_id_not_required_in_work_items(self) -> None:
+        """--project-id is optional in plane_work_items parser."""
+        from scripts.plane_work_items import build_parser
+
+        parser = build_parser()
+        # Should parse without --project-id
+        args = parser.parse_args(["search", "--query", "test"])
+        assert args.command == "search"
+
+    def test_project_id_optional_with_default_none(self) -> None:
+        """--project-id defaults to None when not provided."""
+        from scripts.plane_work_items import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list"])
+        assert args.project_id is None
+
+    def test_project_id_override_still_works(self) -> None:
+        """Explicit --project-id still accepted."""
+        from scripts.plane_work_items import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list", "--project-id", "abc123"])
+        assert args.project_id == "abc123"

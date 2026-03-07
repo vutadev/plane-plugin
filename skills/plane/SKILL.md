@@ -15,8 +15,56 @@ Resolve all relative paths from this directory:
 
 - Scripts: `scripts/...`
 - References: `references/...`
-- Config: `~/.planerc` (global) + `./.planerc` (project override, JSON format)
+- Config: `~/.planerc` (global) + `./.planerc` (project override, KEY=VALUE or JSON format)
 - Requirements: `requirements.txt`
+
+## Configuration (.planerc)
+
+Config is read from `~/.planerc` (global) and `./.planerc` (project-local). Local values override global on a per-field basis.
+
+Supported formats (auto-detected):
+
+**KEY=VALUE:**
+```
+# Plane API Configuration
+api_key=plane_api_xxx
+workspace_slug=my-workspace
+base_url=https://api.plane.so
+project_id=your-project-uuid
+```
+
+**JSON:**
+```json
+{
+  "api_key": "plane_api_xxx",
+  "workspace_slug": "my-workspace",
+  "base_url": "https://api.plane.so",
+  "project_id": "your-project-uuid"
+}
+```
+
+### Config Keys
+
+```
+# (required*) API key for authentication
+api_key=plane_api_xxx
+
+# (required*) Alternative: access token (use one of api_key or access_token)
+access_token=your-access-token
+
+# (required) Workspace slug (alias: workspace)
+workspace_slug=my-workspace
+
+# (optional) API base URL (default: https://api.plane.so)
+base_url=https://api.plane.so
+
+# (optional) Default project UUID — when set, all commands use this project
+# and --project-id becomes optional
+project_id=your-project-uuid
+
+# (optional) Set to "true" to block work item deletion
+disable_delete_issue=true
+```
 
 ## When to Use
 
