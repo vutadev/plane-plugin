@@ -5,5 +5,5 @@
   "author": { "name": "anhvu" },
   "license": "MIT",
   "keywords": ["plane", "project-management", "agile"],
-  "skills": ["skills/plane/SKILL.md"]
+  "skills": "./skills/"
 }
