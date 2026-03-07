@@ -1,0 +1,23 @@
+{
+  "name": "vutadev-plane-plugin",
+  "owner": {
+    "name": "anhvu"
+  },
+  "metadata": {
+    "description": "Plane project management plugin for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "plane",
+      "source": "./",
+      "description": "Manage projects, work items, cycles, modules on Plane via plane-sdk",
+      "version": "1.0.0",
+      "author": {
+        "name": "anhvu"
+      },
+      "license": "MIT",
+      "keywords": ["plane", "project-management", "agile"],
+      "category": "project-management"
+    }
+  ]
+}

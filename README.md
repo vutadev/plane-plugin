@@ -6,16 +6,20 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin for manag
 
 ### Install the Plugin
 
+From within Claude Code, add the marketplace and install the plugin:
+
+```
+/plugin marketplace add vutadev/plane-plugin
+/plugin install plane@vutadev-plane-plugin
+```
+
+Or for local development:
+
 ```bash
-# Install from GitHub
-claude plugin add --git https://github.com/anhvuit/plane-plugin.git
-
-# Or from a local checkout
-claude plugin add /path/to/plane-plugin
-
-# Or run Claude Code with the plugin directory (development)
 claude --plugin-dir /path/to/plane-plugin
 ```
+
+Once loaded, the plugin's skill is available as `/plane:plane`.
 
 ### First-Time Setup
 
