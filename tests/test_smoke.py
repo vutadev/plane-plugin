@@ -103,7 +103,7 @@ class TestClientHelper:
         global_home = tmp_path / "home"
         global_home.mkdir()
         global_rc = global_home / ".planerc"
-        global_rc.write_text("api_key=global-key\nworkspace=global-ws\nbase_url=https://global.plane.so")
+        global_rc.write_text("api_key=global-key\nworkspace_slug=global-ws\nbase_url=https://global.plane.so")
 
         # Create local config that overrides api_key only
         local_dir = tmp_path / "project"
@@ -116,7 +116,7 @@ class TestClientHelper:
 
         config = plane_client._load_planerc_config()
         assert config["api_key"] == "local-key"
-        assert config["workspace"] == "global-ws"
+        assert config["workspace_slug"] == "global-ws"
         assert config["base_url"] == "https://global.plane.so"
 
     def test_planerc_json_format(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

@@ -4,5 +4,6 @@
   "description": "Manage projects, work items, cycles, modules on Plane via plane-sdk",
   "author": { "name": "anhvu" },
   "license": "MIT",
-  "keywords": ["plane", "project-management", "agile"]
+  "keywords": ["plane", "project-management", "agile"],
+  "skills": ["skills/plane/SKILL.md"]
 }

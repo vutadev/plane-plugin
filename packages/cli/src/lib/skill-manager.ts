@@ -1,4 +1,4 @@
-import {execSync} from 'node:child_process'
+import {execFileSync} from 'node:child_process'
 import {promises as fs} from 'node:fs'
 import {homedir, tmpdir} from 'node:os'
 import {basename, join, resolve} from 'node:path'
@@ -8,8 +8,16 @@ export interface SkillMeta {
   name: string
 }
 
+export interface SkillSource {
+  installedAt: string
+  originalPath?: string
+  type: 'git' | 'local'
+  url?: string
+}
+
 export interface InstalledSkill extends SkillMeta {
   path: string
+  source?: null | SkillSource
   type: 'copy' | 'symlink'
 }
 
@@ -85,6 +93,26 @@ export async function readSkillMeta(skillDir: string): Promise<SkillMeta> {
   return meta
 }
 
+async function writeSkillSource(skillName: string, source: SkillSource): Promise<void> {
+  await fs.writeFile(
+    join(getSkillsDir(), `${skillName}.source.json`),
+    JSON.stringify(source, null, 2),
+    'utf8',
+  )
+}
+
+export async function readSkillSource(skillName: string): Promise<null | SkillSource> {
+  try {
+    const content = await fs.readFile(
+      join(getSkillsDir(), `${skillName}.source.json`),
+      'utf8',
+    )
+    return JSON.parse(content) as SkillSource
+  } catch {
+    return null
+  }
+}
+
 export async function installFromLocal(skillDir: string, options?: {force?: boolean}): Promise<InstalledSkill> {
   const absSkillDir = resolve(skillDir)
   const meta = await readSkillMeta(absSkillDir)
@@ -109,6 +137,13 @@ export async function installFromLocal(skillDir: string, options?: {force?: bool
   // Create symlink
   await fs.symlink(absSkillDir, targetDir, 'dir')
 
+  // Persist source metadata
+  await writeSkillSource(meta.name, {
+    installedAt: new Date().toISOString(),
+    originalPath: absSkillDir,
+    type: 'local',
+  })
+
   // Run install.sh if it exists (non-fatal)
   await runPostInstall(absSkillDir)
 
@@ -125,7 +160,7 @@ export async function installFromGit(source: string, options?: {force?: boolean}
   // Clone to temp directory
   const tempDir = join(tmpdir(), `plane-skill-${Date.now()}`)
   try {
-    execSync(`git clone --depth 1 ${url} ${tempDir}`, {stdio: 'pipe'})
+    execFileSync('git', ['clone', '--depth', '1', url, tempDir], {stdio: 'pipe'})
   } catch {
     throw new Error(`Failed to clone ${url}`)
   }
@@ -152,7 +187,14 @@ export async function installFromGit(source: string, options?: {force?: boolean}
     }
 
     // Copy skill dir to target
-    execSync(`cp -r "${skillDir}" "${targetDir}"`, {stdio: 'pipe'})
+    execFileSync('cp', ['-r', skillDir, targetDir], {stdio: 'pipe'})
+
+    // Persist source metadata
+    await writeSkillSource(meta.name, {
+      installedAt: new Date().toISOString(),
+      type: 'git',
+      url: source,
+    })
 
     // Run install.sh if it exists (non-fatal)
     await runPostInstall(targetDir)
@@ -173,6 +215,43 @@ export async function removeSkill(name: string): Promise<void> {
   }
 
   await fs.rm(targetDir, {force: true, recursive: true})
+  // Clean up source metadata
+  await fs.rm(join(getSkillsDir(), `${name}.source.json`), {force: true}).catch(() => {})
+}
+
+export async function updateSkill(name: string): Promise<InstalledSkill> {
+  const targetDir = join(getSkillsDir(), name)
+
+  try {
+    await fs.access(targetDir)
+  } catch {
+    throw new Error(`Skill "${name}" is not installed`)
+  }
+
+  const source = await readSkillSource(name)
+  const stat = await fs.lstat(targetDir)
+  const isSymlink = stat.isSymbolicLink()
+
+  if (isSymlink) {
+    // For local symlinks: remove and re-create symlink
+    const originalPath = source?.originalPath ?? await fs.readlink(targetDir)
+    await fs.rm(targetDir, {force: true, recursive: true})
+    await fs.rm(join(getSkillsDir(), `${name}.source.json`), {force: true}).catch(() => {})
+    return installFromLocal(originalPath, {force: true})
+  }
+
+  // For git-installed (copy): need the URL
+  if (!source?.url) {
+    throw new Error(
+      `No source URL recorded for skill "${name}". ` +
+      `Re-install with "skill install github:user/repo" to enable updates.`,
+    )
+  }
+
+  await fs.rm(targetDir, {force: true, recursive: true})
+  await fs.rm(join(getSkillsDir(), `${name}.source.json`), {force: true}).catch(() => {})
+
+  return installFromGit(source.url, {force: true})
 }
 
 export async function listSkills(): Promise<InstalledSkill[]> {
@@ -200,10 +279,11 @@ export async function listSkills(): Promise<InstalledSkill[]> {
       const stat = await fs.lstat(entryPath)
       const type = stat.isSymbolicLink() ? 'symlink' : 'copy'
       const realPath = stat.isSymbolicLink() ? await fs.readlink(entryPath) : entryPath
+      const source = await readSkillSource(entry.name)
 
       try {
         const meta = await readSkillMeta(entryPath)
-        return {...meta, path: realPath, type}
+        return {...meta, path: realPath, source, type}
       } catch {
         return null
       }
@@ -217,7 +297,7 @@ async function runPostInstall(dir: string): Promise<void> {
   const scriptPath = join(dir, 'scripts', 'install.sh')
   try {
     await fs.access(scriptPath)
-    execSync(`bash "${scriptPath}"`, {cwd: dir, stdio: 'pipe'})
+    execFileSync('bash', [scriptPath], {cwd: dir, stdio: 'pipe'})
   } catch {
     // Non-fatal: install.sh missing or failed
   }

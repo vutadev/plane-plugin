@@ -105,7 +105,7 @@ else:
             k, _, v = line.partition('=')
             config[k.strip()] = v.strip()
 if config.get('api_key') or config.get('access_token') or config.get('apiKey') or config.get('accessToken'):
-    if config.get('workspace'):
+    if config.get('workspace_slug') or config.get('workspace'):
         sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
@@ -117,7 +117,7 @@ fi
 if [ "$needs_setup" = true ]; then
   if [ ! -t 0 ]; then
     err ".planerc not configured and stdin is not interactive."
-    err "Create ~/.planerc or ./.planerc with: api_key=... and workspace=..."
+    err "Create ~/.planerc or ./.planerc with: api_key=... and workspace_slug=..."
     exit 1
   fi
 
@@ -167,7 +167,7 @@ if parent:
 with open(path, 'w') as f:
     f.write('# Plane API Configuration\n')
     f.write(f\"api_key={os.environ['API_KEY']}\n\")
-    f.write(f\"workspace={os.environ['WORKSPACE']}\n\")
+    f.write(f\"workspace_slug={os.environ['WORKSPACE']}\n\")
     f.write(f\"base_url={os.environ['BASE_URL']}\n\")
 os.chmod(path, 0o600)
 "

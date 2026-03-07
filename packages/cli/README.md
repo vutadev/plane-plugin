@@ -1,19 +1,8 @@
 # plane-cli
 
-CLI for [Plane](https://plane.so) project management.
+CLI for managing Claude Code skills for the [Plane](https://plane.so) plugin.
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/plane-cli.svg)](https://npmjs.org/package/plane-cli)
-[![Downloads/week](https://img.shields.io/npm/dw/plane-cli.svg)](https://npmjs.org/package/plane-cli)
-
-<!-- toc -->
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Commands](#commands)
-- [Examples](#examples)
-<!-- tocstop -->
 
 ## Installation
 
@@ -21,248 +10,101 @@ CLI for [Plane](https://plane.so) project management.
 npm install -g plane-cli
 ```
 
-## Quick Start
+### Claude Code Plugin
+
+This CLI is part of the **plane-plugin** for Claude Code. To use the Plane skill with Claude Code:
 
 ```bash
-# Configure authentication
-plane-cli config init
+# Install from a local checkout
+claude plugin add /path/to/plane-plugin
 
-# List your projects
-plane-cli project list
-
-# Create an issue
-plane-cli issue create --project MY-PROJECT --name "Fix login bug"
-
-# View issue details (supports PROJECT-123 format)
-plane-cli issue get MY-42
+# Or run Claude Code with the plugin directory
+claude --plugin-dir /path/to/plane-plugin
 ```
 
-## Configuration
-
-Configuration is stored in `~/.planerc`:
-
-```json
-{
-  "workspace": "my-workspace",
-  "apiKey": "plane_api_xxx",
-  "baseUrl": "https://api.plane.so/api/v1"
-}
-```
-
-Or use environment variables:
-
-- `PLANE_API_KEY` or `PLANE_ACCESS_TOKEN` - Your Plane API credentials
-- `PLANE_WORKSPACE_SLUG` - Your workspace slug
-- `PLANE_BASE_URL` - API base URL (optional, defaults to https://api.plane.so/api/v1)
-
-Environment variables override config file values.
-
-### Config Commands
-
-```bash
-# Initialize configuration interactively
-plane-cli config init
-
-# View current configuration
-plane-cli config show
-
-# Set a specific config value
-plane-cli config set workspace my-workspace
-plane-cli config set apiKey plane_api_xxx
-```
+The plugin registers the Plane skill defined in `skills/plane/SKILL.md`, giving Claude Code the ability to manage Plane projects, work items, cycles, and modules.
 
 ## Commands
 
-### Project Commands
+| Command | Description |
+| --- | --- |
+| `plane-cli skill install [SOURCE]` | Install a skill from a local path or GitHub |
+| `plane-cli skill list` | List installed skills |
+| `plane-cli skill update [NAME]` | Update installed skills |
+| `plane-cli skill remove <NAME>` | Remove an installed skill |
 
-| Command                      | Description                        |
-| ---------------------------- | ---------------------------------- |
-| `plane-cli project list`     | List all projects in workspace     |
-| `plane-cli project get <id>` | Get project details                |
-| `plane-cli project create`   | Create a new project (interactive) |
-| `plane-cli project update`   | Update a project                   |
-| `plane-cli project delete`   | Delete a project                   |
-| `plane-cli project members`  | List project members               |
+### skill install
 
-### Issue Commands
+```bash
+# Install from current directory (auto-discovers SKILL.md)
+plane-cli skill install
 
-| Command                           | Description                          |
-| --------------------------------- | ------------------------------------ |
-| `plane-cli issue list`            | List issues in a project             |
-| `plane-cli issue get <id>`        | Get issue details (supports PROJECT-123 format) |
-| `plane-cli issue create`          | Create an issue (interactive wizard) |
-| `plane-cli issue update <id>`     | Update an issue                      |
-| `plane-cli issue delete <id>`     | Delete an issue                      |
-| `plane-cli issue search <query>`  | Search issues                        |
+# Install from a specific path
+plane-cli skill install ./my-skill
 
-### Cycle Commands
+# Install from GitHub
+plane-cli skill install github:user/repo
 
-| Command                               | Description                    |
-| ------------------------------------- | ------------------------------ |
-| `plane-cli cycle list`                | List cycles                    |
-| `plane-cli cycle get <id>`            | Get cycle details              |
-| `plane-cli cycle create`              | Create a cycle                 |
-| `plane-cli cycle update <id>`         | Update a cycle                 |
-| `plane-cli cycle delete <id>`         | Delete a cycle                 |
-| `plane-cli cycle archive <id>`        | Archive a cycle                |
-| `plane-cli cycle unarchive <id>`      | Unarchive a cycle              |
-| `plane-cli cycle add-issues <id>`     | Add issues to a cycle          |
-| `plane-cli cycle remove-issue <id>`   | Remove an issue from a cycle   |
-| `plane-cli cycle transfer <from> <to>`| Transfer issues between cycles |
+# Force overwrite an existing skill
+plane-cli skill install --force github:user/repo
+```
 
-### Module Commands
+- **Local installs** create a symlink at `~/.claude/skills/<name>` (changes reflected immediately).
+- **Git installs** clone the repo and copy the skill to `~/.claude/skills/<name>`.
 
-| Command                                | Description                    |
-| -------------------------------------- | ------------------------------ |
-| `plane-cli module list`                | List modules                   |
-| `plane-cli module get <id>`            | Get module details             |
-| `plane-cli module create`              | Create a module                |
-| `plane-cli module update <id>`         | Update a module                |
-| `plane-cli module delete <id>`         | Delete a module                |
-| `plane-cli module archive <id>`        | Archive a module               |
-| `plane-cli module unarchive <id>`      | Unarchive a module             |
-| `plane-cli module add-issues <id>`     | Add issues to a module         |
-| `plane-cli module remove-issue <id>`   | Remove an issue from a module  |
+### skill list
 
-### Label Commands
+```bash
+# Table output
+plane-cli skill list
 
-| Command                      | Description           |
-| ---------------------------- | --------------------- |
-| `plane-cli label list`       | List labels           |
-| `plane-cli label get <id>`   | Get label details     |
-| `plane-cli label create`     | Create a label        |
-| `plane-cli label update <id>`| Update a label        |
-| `plane-cli label delete <id>`| Delete a label        |
+# JSON output
+plane-cli skill list --json
+```
 
-### State Commands
+### skill update
 
-| Command                      | Description           |
-| ---------------------------- | --------------------- |
-| `plane-cli state list`       | List states           |
-| `plane-cli state create`     | Create a state        |
-| `plane-cli state delete <id>`| Delete a state        |
+Re-install skills from their original source.
 
-### Intake Commands
+```bash
+# Update all installed skills
+plane-cli skill update
 
-| Command                      | Description           |
-| ---------------------------- | --------------------- |
-| `plane-cli intake list`      | List intakes          |
-| `plane-cli intake create`    | Create an intake      |
-| `plane-cli intake delete <id>`| Delete an intake     |
+# Update a specific skill
+plane-cli skill update my-skill
+```
 
-### Initiative Commands
+- **Git skills** are deleted and re-cloned from the original URL.
+- **Local skills** are re-symlinked from the original path.
 
-| Command                           | Description              |
-| --------------------------------- | ------------------------ |
-| `plane-cli initiative list`       | List initiatives         |
-| `plane-cli initiative create`     | Create an initiative     |
-| `plane-cli initiative delete <id>`| Delete an initiative     |
+### skill remove
 
-### Page Commands
+```bash
+# Remove with confirmation prompt
+plane-cli skill remove my-skill
 
-| Command                                      | Description                  |
-| -------------------------------------------- | ---------------------------- |
-| `plane-cli page get-workspace <id>`          | Get workspace page           |
-| `plane-cli page get-project <project> <id>`  | Get project page             |
-| `plane-cli page create`                      | Create a page                |
-
-### User Commands
-
-| Command           | Description         |
-| ----------------- | ------------------- |
-| `plane-cli user me` | Get current user  |
-
-### Workspace Commands
-
-| Command                      | Description              |
-| ---------------------------- | ------------------------ |
-| `plane-cli workspace members`| List workspace members   |
+# Skip confirmation
+plane-cli skill remove my-skill --force
+```
 
 ## Examples
 
-### Working with Projects
-
 ```bash
-# List all projects
-plane-cli project list
+# Install a skill from GitHub
+plane-cli skill install github:user/my-skill
 
-# List projects as JSON
-plane-cli project list --json
+# Check what's installed
+plane-cli skill list
 
-# Get project details
-plane-cli project get proj-uuid-1234
+# Pull latest changes
+plane-cli skill update
 
-# Create a new project
-plane-cli project create --name "My Project" --identifier "MP"
+# Output as JSON for scripting
+plane-cli skill list --json | jq '.[].name'
 
-# Delete a project (requires confirmation)
-plane-cli project delete proj-uuid-1234 --confirm
+# Remove a skill
+plane-cli skill remove my-skill --force
 ```
-
-### Working with Issues
-
-```bash
-# List issues in a project
-plane-cli issue list --project proj-uuid-1234
-
-# List issues filtered by cycle
-plane-cli issue list --project proj-uuid-1234 --cycle cycle-uuid
-
-# Get issue by PROJECT-123 format
-plane-cli issue get MP-42
-
-# Get issue by UUID
-plane-cli issue get issue-uuid-1234 --project proj-uuid-1234
-
-# Create a high priority issue
-plane-cli issue create --project proj-uuid-1234 --name "Critical bug" --priority urgent
-
-# Search issues
-plane-cli issue search "login bug"
-```
-
-### Working with Cycles
-
-```bash
-# List all cycles
-plane-cli cycle list --project proj-uuid-1234
-
-# Create a cycle with dates
-plane-cli cycle create --project proj-uuid-1234 --name "Sprint 1" --start-date 2024-01-01 --end-date 2024-01-14
-
-# Add issues to a cycle
-plane-cli cycle add-issues cycle-uuid --issues issue-1,issue-2,issue-3
-
-# Archive a cycle
-plane-cli cycle archive cycle-uuid
-```
-
-### Working with Modules
-
-```bash
-# List modules
-plane-cli module list --project proj-uuid-1234
-
-# Create a module
-plane-cli module create --project proj-uuid-1234 --name "Feature Module"
-
-# Add issues to a module
-plane-cli module add-issues module-uuid --issues issue-1,issue-2
-```
-
-### Global Flags
-
-All commands support these global flags:
-
-| Flag          | Description                        |
-| ------------- | ---------------------------------- |
-| `--json`      | Output as JSON                     |
-| `--no-input`  | Disable interactive prompts        |
-| `--help`      | Show help for a command            |
-
-## API Documentation
-
-For more information about the Plane API, visit the [Plane API Documentation](https://docs.plane.so/api-reference/introduction).
 
 ## License
 

@@ -5,7 +5,7 @@ including states, labels, and initial work items.
 
 ## Prerequisites
 
-- Config file set up (`~/.planerc` or `./.planerc` with `apiKey` and `workspace`)
+- Config file set up (`~/.planerc` or `./.planerc` with `api_key` and `workspace_slug`)
 - Connection verified: `python scripts/plane_verify.py`
 
 ## Steps
