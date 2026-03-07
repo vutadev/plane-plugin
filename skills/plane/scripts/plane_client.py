@@ -6,7 +6,7 @@ a ready-to-use (PlaneClient, workspace_slug) tuple.
 
 Config resolution:
     1) ~/.planerc (global config)
-    2) CWD/.planerc (project-local override, field-level merge)
+    2) $CLAUDE_PROJECT_DIR/.planerc (project-local override, field-level merge)
 
 Supported formats (auto-detected):
     KEY=VALUE (like .envrc/.npmrc):
@@ -71,7 +71,7 @@ def _parse_planerc(text: str, path: Path) -> dict:
 
 
 def _load_planerc_config() -> dict:
-    """Load config from ~/.planerc (global) merged with CWD/.planerc (local).
+    """Load config from ~/.planerc (global) merged with $CLAUDE_PROJECT_DIR/.planerc (local).
 
     Returns merged config dict. Project-local values override global.
     Results are cached for the lifetime of the process.
@@ -81,14 +81,13 @@ def _load_planerc_config() -> dict:
         return _CONFIG_CACHE
     config: dict = {}
     global_path = Path.home() / ".planerc"
-    local_path = Path.cwd() / ".planerc"
 
     # CLAUDE_PROJECT_DIR points to the actual project root when run as a skill
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
     project_path = Path(project_dir) / ".planerc" if project_dir else None
 
-    candidates = [global_path, local_path]
-    if project_path and project_path != local_path:
+    candidates = [global_path]
+    if project_path:
         candidates.append(project_path)
 
     for path in candidates:
@@ -135,7 +134,7 @@ def get_client() -> tuple["PlaneClient", str]:
         for err in errors:
             print(f"ERROR: {err}", file=sys.stderr)
         print(
-            "\nCreate ~/.planerc or ./.planerc with:",
+            "\nCreate ~/.planerc or $CLAUDE_PROJECT_DIR/.planerc with:",
             file=sys.stderr,
         )
         print(
@@ -193,7 +192,8 @@ if __name__ == "__main__":
     try:
         client, slug = get_client()
         global_rc = Path.home() / ".planerc"
-        local_rc = Path.cwd() / ".planerc"
+        project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        project_rc = Path(project_dir) / ".planerc" if project_dir else None
         print(dump_json({
             "status": "ok",
             "workspace_slug": slug,
@@ -201,7 +201,7 @@ if __name__ == "__main__":
             "auth_method": "api_key" if client.config.api_key else "access_token",
             "config_sources": {
                 "global": str(global_rc) if global_rc.is_file() else None,
-                "local": str(local_rc) if local_rc.is_file() else None,
+                "project": str(project_rc) if project_rc and project_rc.is_file() else None,
             },
         }))
     except SystemExit:

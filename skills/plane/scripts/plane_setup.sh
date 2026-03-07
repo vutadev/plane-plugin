@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 REQ_FILE="$SKILL_DIR/requirements.txt"
 GLOBAL_RC="$HOME/.planerc"
-LOCAL_RC="$(pwd)/.planerc"
+LOCAL_RC="${CLAUDE_PROJECT_DIR:+$CLAUDE_PROJECT_DIR/.planerc}"
 
 # Colors (fallback to plain if no tty)
 if [ -t 1 ]; then
@@ -81,7 +81,7 @@ info "Checking Plane configuration..."
 # Check existing configs for required fields (supports both KEY=VALUE and JSON)
 needs_setup=true
 existing_config=""
-if [ -f "$LOCAL_RC" ]; then
+if [ -n "$LOCAL_RC" ] && [ -f "$LOCAL_RC" ]; then
   existing_config="$LOCAL_RC"
 elif [ -f "$GLOBAL_RC" ]; then
   existing_config="$GLOBAL_RC"
@@ -117,7 +117,7 @@ fi
 if [ "$needs_setup" = true ]; then
   if [ ! -t 0 ]; then
     err ".planerc not configured and stdin is not interactive."
-    err "Create ~/.planerc or ./.planerc with: api_key=... and workspace_slug=..."
+    err "Create ~/.planerc with: api_key=... and workspace_slug=..."
     exit 1
   fi
 
@@ -130,11 +130,21 @@ if [ "$needs_setup" = true ]; then
   # Config location choice
   echo "Where should the config be saved?"
   echo "  1) Global  (~/.planerc) — shared across all projects"
-  echo "  2) Local   (./.planerc) — this project only"
+  if [ -n "$LOCAL_RC" ]; then
+    echo "  2) Local   ($LOCAL_RC) — this project only"
+  else
+    echo "  2) Local   (unavailable — CLAUDE_PROJECT_DIR not set)"
+  fi
   read -rp "Choice [1]: " location_choice
   case "${location_choice:-1}" in
     1) RC_FILE="$GLOBAL_RC" ;;
-    2) RC_FILE="$LOCAL_RC" ;;
+    2)
+      if [ -z "$LOCAL_RC" ]; then
+        err "Cannot save locally: CLAUDE_PROJECT_DIR is not set."
+        exit 1
+      fi
+      RC_FILE="$LOCAL_RC"
+      ;;
     *) err "Invalid choice"; exit 1 ;;
   esac
 

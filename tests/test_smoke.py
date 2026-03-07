@@ -105,14 +105,14 @@ class TestClientHelper:
         global_rc = global_home / ".planerc"
         global_rc.write_text("api_key=global-key\nworkspace_slug=global-ws\nbase_url=https://global.plane.so")
 
-        # Create local config that overrides api_key only
-        local_dir = tmp_path / "project"
-        local_dir.mkdir()
-        local_rc = local_dir / ".planerc"
-        local_rc.write_text("api_key=local-key")
+        # Create project config that overrides api_key only
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        project_rc = project_dir / ".planerc"
+        project_rc.write_text("api_key=local-key")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+        monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_dir))
 
         config = plane_client._load_planerc_config()
         assert config["api_key"] == "local-key"
@@ -130,11 +130,8 @@ class TestClientHelper:
         global_rc = global_home / ".planerc"
         global_rc.write_text('{"api_key": "json-key", "workspace": "json-ws"}')
 
-        local_dir = tmp_path / "project"
-        local_dir.mkdir()
-
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
 
         config = plane_client._load_planerc_config()
         assert config["api_key"] == "json-key"
@@ -248,11 +245,9 @@ class TestConfigCache:
         global_home = tmp_path / "home"
         global_home.mkdir()
         (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=ws1")
-        local_dir = tmp_path / "project"
-        local_dir.mkdir()
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
 
         first = plane_client._load_planerc_config()
         second = plane_client._load_planerc_config()
@@ -268,11 +263,9 @@ class TestConfigCache:
         global_home.mkdir()
         rc = global_home / ".planerc"
         rc.write_text("api_key=k1\nworkspace_slug=ws1")
-        local_dir = tmp_path / "project"
-        local_dir.mkdir()
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
 
         first = plane_client._load_planerc_config()
         assert first["api_key"] == "k1"
@@ -298,11 +291,9 @@ class TestWorkspaceSlugAlias:
         global_home = tmp_path / "home"
         global_home.mkdir()
         (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=my-ws")
-        local_dir = tmp_path / "project"
-        local_dir.mkdir()
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: local_dir))
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
 
         config = plane_client._load_planerc_config()
         assert config["workspace_slug"] == "my-ws"
