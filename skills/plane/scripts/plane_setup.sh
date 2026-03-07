@@ -179,10 +179,25 @@ with open(path, 'w') as f:
     f.write(f\"api_key={os.environ['API_KEY']}\n\")
     f.write(f\"workspace_slug={os.environ['WORKSPACE']}\n\")
     f.write(f\"base_url={os.environ['BASE_URL']}\n\")
+    f.write('disable_delete_issue=true\n')
 os.chmod(path, 0o600)
 "
 
   ok "Saved to $RC_FILE"
+
+  # Add .planerc to project .gitignore if CLAUDE_PROJECT_DIR is set
+  if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    PROJECT_GITIGNORE="$CLAUDE_PROJECT_DIR/.gitignore"
+    if [ -f "$PROJECT_GITIGNORE" ]; then
+      if ! grep -qxF '.planerc' "$PROJECT_GITIGNORE"; then
+        echo '.planerc' >> "$PROJECT_GITIGNORE"
+        ok "Added .planerc to $PROJECT_GITIGNORE"
+      fi
+    else
+      echo '.planerc' > "$PROJECT_GITIGNORE"
+      ok "Created $PROJECT_GITIGNORE with .planerc"
+    fi
+  fi
 fi
 
 # --- Step 5: Verify connection ---
