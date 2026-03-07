@@ -21,6 +21,7 @@ Supported formats (auto-detected):
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import json
 from pathlib import Path
@@ -82,7 +83,15 @@ def _load_planerc_config() -> dict:
     global_path = Path.home() / ".planerc"
     local_path = Path.cwd() / ".planerc"
 
-    for path in [global_path, local_path]:
+    # CLAUDE_PROJECT_DIR points to the actual project root when run as a skill
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    project_path = Path(project_dir) / ".planerc" if project_dir else None
+
+    candidates = [global_path, local_path]
+    if project_path and project_path != local_path:
+        candidates.append(project_path)
+
+    for path in candidates:
         if path.is_file():
             try:
                 text = path.read_text()
