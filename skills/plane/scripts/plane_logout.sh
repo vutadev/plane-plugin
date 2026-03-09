@@ -4,7 +4,7 @@
 set -euo pipefail
 
 GLOBAL_RC="$HOME/.planerc"
-LOCAL_RC="${CLAUDE_PROJECT_DIR:+$CLAUDE_PROJECT_DIR/.planerc}"
+LOCAL_RC="$PWD/.planerc"
 
 if [ -t 1 ]; then
   GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -23,7 +23,7 @@ Usage: bash scripts/plane_logout.sh [--confirm]
 
 Removes saved Plane credentials from:
   - $GLOBAL_RC (global config — affects ALL projects)
-  - \$CLAUDE_PROJECT_DIR/.planerc (project-local config, if set)
+  - ./.planerc (project-local config)
 
 WARNING: Removing ~/.planerc will affect all projects using that config.
 EOF
@@ -49,7 +49,7 @@ if [ -f "$GLOBAL_RC" ]; then
   removed_any=true
 fi
 
-if [ -n "$LOCAL_RC" ] && [ -f "$LOCAL_RC" ]; then
+if [ -f "$LOCAL_RC" ]; then
   rm -f "$LOCAL_RC"
   ok "Removed $LOCAL_RC"
   removed_any=true

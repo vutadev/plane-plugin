@@ -112,7 +112,7 @@ class TestClientHelper:
         project_rc.write_text("api_key=local-key")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_dir))
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: project_dir))
 
         config = plane_client._load_planerc_config()
         assert config["api_key"] == "local-key"
@@ -130,8 +130,11 @@ class TestClientHelper:
         global_rc = global_home / ".planerc"
         global_rc.write_text('{"api_key": "json-key", "workspace": "json-ws"}')
 
+        # Point cwd to a dir with no .planerc so only global is used
+        empty_dir = tmp_path / "empty"
+        empty_dir.mkdir()
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: empty_dir))
 
         config = plane_client._load_planerc_config()
         assert config["api_key"] == "json-key"
@@ -199,10 +202,10 @@ class TestArgParsing:
             "add-items",
             "--project-id", "p1",
             "--cycle-id", "c1",
-            "--issue-ids", "id1,id2",
+            "--work-item-ids", "id1,id2",
         ])
         assert args.command == "add-items"
-        assert args.issue_ids == "id1,id2"
+        assert args.work_item_ids == "id1,id2"
 
     def test_work_item_extras_comments_create(self) -> None:
         from scripts.plane_work_item_extras import build_parser
@@ -247,7 +250,7 @@ class TestConfigCache:
         (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=ws1")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: tmp_path / "no-planerc"))
 
         first = plane_client._load_planerc_config()
         second = plane_client._load_planerc_config()
@@ -265,7 +268,7 @@ class TestConfigCache:
         rc.write_text("api_key=k1\nworkspace_slug=ws1")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: tmp_path / "no-planerc"))
 
         first = plane_client._load_planerc_config()
         assert first["api_key"] == "k1"
@@ -293,7 +296,7 @@ class TestWorkspaceSlugAlias:
         (global_home / ".planerc").write_text("api_key=k1\nworkspace_slug=my-ws")
 
         monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: global_home))
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setattr("pathlib.Path.cwd", staticmethod(lambda: tmp_path / "no-planerc"))
 
         config = plane_client._load_planerc_config()
         assert config["workspace_slug"] == "my-ws"

@@ -15,12 +15,12 @@ Resolve all relative paths from this directory:
 
 - Scripts: `scripts/...`
 - References: `references/...`
-- Config: `~/.planerc` (global) + `$CLAUDE_PROJECT_DIR/.planerc` (project override, KEY=VALUE or JSON format)
+- Config: `~/.planerc` (global) + `./.planerc` (project override, KEY=VALUE or JSON format)
 - Requirements: `requirements.txt`
 
 ## Configuration (.planerc)
 
-Config is read from `~/.planerc` (global) and `$CLAUDE_PROJECT_DIR/.planerc` (project-local). Local values override global on a per-field basis.
+Config is read from `~/.planerc` (global) and `./.planerc` (project-local). Local values override global on a per-field basis.
 
 Supported formats (auto-detected):
 
@@ -87,7 +87,7 @@ Run the interactive setup to install Python deps and configure `.planerc`:
 bash scripts/plane_setup.sh
 ```
 
-This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.planerc` is missing, ask whether to save globally (`~/.planerc`) or locally (`$CLAUDE_PROJECT_DIR/.planerc`), and verify the connection.
+This will: detect Python ≥ 3.10, install `plane-sdk`, prompt for API key + workspace slug if `.planerc` is missing, ask whether to save globally (`~/.planerc`) or locally (`./.planerc`), and verify the connection.
 
 ## Pre-flight (Run Once Per Session)
 
@@ -98,7 +98,7 @@ PYTHON=$(command -v python3 || command -v python)
 $PYTHON scripts/plane_verify.py
 ```
 
-If verify fails, check that `~/.planerc` or `$CLAUDE_PROJECT_DIR/.planerc` exists with valid config, or run `bash scripts/plane_setup.sh`. See `references/troubleshooting.md` for details.
+If verify fails, check that `~/.planerc` or `./.planerc` exists with valid config, or run `bash scripts/plane_setup.sh`. See `references/troubleshooting.md` for details.
 
 ## Logout / Clear Credentials
 

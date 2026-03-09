@@ -6,8 +6,7 @@ a ready-to-use (PlaneClient, workspace_slug) tuple.
 
 Config resolution:
     1) ~/.planerc (global config)
-    2) $CLAUDE_PROJECT_DIR/.planerc (project-local override, field-level merge)
-    3) If CLAUDE_PROJECT_DIR is unset, walk up from script dir to find .planerc (stops at git root)
+    2) $PWD/.planerc (project-local override, field-level merge)
 
 Supported formats (auto-detected):
     KEY=VALUE (like .envrc/.npmrc):
@@ -22,7 +21,6 @@ Supported formats (auto-detected):
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import json
 from pathlib import Path
@@ -72,7 +70,7 @@ def _parse_planerc(text: str, path: Path) -> dict:
 
 
 def _load_planerc_config() -> dict:
-    """Load config from ~/.planerc (global) merged with $CLAUDE_PROJECT_DIR/.planerc (local).
+    """Load config from ~/.planerc (global) merged with $PWD/.planerc (local).
 
     Returns merged config dict. Project-local values override global.
     Results are cached for the lifetime of the process.
@@ -83,25 +81,9 @@ def _load_planerc_config() -> dict:
     config: dict = {}
     global_path = Path.home() / ".planerc"
 
-    # CLAUDE_PROJECT_DIR points to the actual project root when run as a skill
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
-    project_path: Path | None = None
-    if project_dir:
-        project_path = Path(project_dir) / ".planerc"
-    else:
-        # Walk up from script directory to find .planerc (stop at git root or fs root)
-        script_dir = Path(__file__).resolve().parent
-        for ancestor in [script_dir, *script_dir.parents]:
-            candidate = ancestor / ".planerc"
-            if candidate.is_file():
-                project_path = candidate
-                break
-            if (ancestor / ".git").exists():
-                break
+    project_path = Path.cwd() / ".planerc"
 
-    candidates = [global_path]
-    if project_path:
-        candidates.append(project_path)
+    candidates = [global_path, project_path]
 
     for path in candidates:
         if path.is_file():
@@ -147,7 +129,7 @@ def get_client() -> tuple["PlaneClient", str]:
         for err in errors:
             print(f"ERROR: {err}", file=sys.stderr)
         print(
-            "\nCreate ~/.planerc or $CLAUDE_PROJECT_DIR/.planerc with:",
+            "\nCreate ~/.planerc or ./.planerc with:",
             file=sys.stderr,
         )
         print(
@@ -226,8 +208,7 @@ if __name__ == "__main__":
     try:
         client, slug = get_client()
         global_rc = Path.home() / ".planerc"
-        project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
-        project_rc = Path(project_dir) / ".planerc" if project_dir else None
+        project_rc = Path.cwd() / ".planerc"
         print(dump_json({
             "status": "ok",
             "workspace_slug": slug,
@@ -235,7 +216,7 @@ if __name__ == "__main__":
             "auth_method": "api_key" if client.config.api_key else "access_token",
             "config_sources": {
                 "global": str(global_rc) if global_rc.is_file() else None,
-                "project": str(project_rc) if project_rc and project_rc.is_file() else None,
+                "project": str(project_rc) if project_rc.is_file() else None,
             },
         }))
     except SystemExit:

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 REQ_FILE="$SKILL_DIR/requirements.txt"
 GLOBAL_RC="$HOME/.planerc"
-LOCAL_RC="${CLAUDE_PROJECT_DIR:+$CLAUDE_PROJECT_DIR/.planerc}"
+LOCAL_RC="$PWD/.planerc"
 
 # Colors (fallback to plain if no tty)
 if [ -t 1 ]; then
@@ -81,7 +81,7 @@ info "Checking Plane configuration..."
 # Check existing configs for required fields (supports both KEY=VALUE and JSON)
 needs_setup=true
 existing_config=""
-if [ -n "$LOCAL_RC" ] && [ -f "$LOCAL_RC" ]; then
+if [ -f "$LOCAL_RC" ]; then
   existing_config="$LOCAL_RC"
 elif [ -f "$GLOBAL_RC" ]; then
   existing_config="$GLOBAL_RC"
@@ -130,19 +130,11 @@ if [ "$needs_setup" = true ]; then
   # Config location choice
   echo "Where should the config be saved?"
   echo "  1) Global  (~/.planerc) — shared across all projects"
-  if [ -n "$LOCAL_RC" ]; then
-    echo "  2) Local   ($LOCAL_RC) — this project only"
-  else
-    echo "  2) Local   (unavailable — CLAUDE_PROJECT_DIR not set)"
-  fi
+  echo "  2) Local   ($LOCAL_RC) — this project only"
   read -rp "Choice [1]: " location_choice
   case "${location_choice:-1}" in
     1) RC_FILE="$GLOBAL_RC" ;;
     2)
-      if [ -z "$LOCAL_RC" ]; then
-        err "Cannot save locally: CLAUDE_PROJECT_DIR is not set."
-        exit 1
-      fi
       RC_FILE="$LOCAL_RC"
       ;;
     *) err "Invalid choice"; exit 1 ;;
@@ -185,18 +177,16 @@ os.chmod(path, 0o600)
 
   ok "Saved to $RC_FILE"
 
-  # Add .planerc to project .gitignore if CLAUDE_PROJECT_DIR is set
-  if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
-    PROJECT_GITIGNORE="$CLAUDE_PROJECT_DIR/.gitignore"
-    if [ -f "$PROJECT_GITIGNORE" ]; then
-      if ! grep -qxF '.planerc' "$PROJECT_GITIGNORE"; then
-        echo '.planerc' >> "$PROJECT_GITIGNORE"
-        ok "Added .planerc to $PROJECT_GITIGNORE"
-      fi
-    else
-      echo '.planerc' > "$PROJECT_GITIGNORE"
-      ok "Created $PROJECT_GITIGNORE with .planerc"
+  # Add .planerc to project .gitignore
+  PROJECT_GITIGNORE="$PWD/.gitignore"
+  if [ -f "$PROJECT_GITIGNORE" ]; then
+    if ! grep -qxF '.planerc' "$PROJECT_GITIGNORE"; then
+      echo '.planerc' >> "$PROJECT_GITIGNORE"
+      ok "Added .planerc to $PROJECT_GITIGNORE"
     fi
+  else
+    echo '.planerc' > "$PROJECT_GITIGNORE"
+    ok "Created $PROJECT_GITIGNORE with .planerc"
   fi
 fi
 
