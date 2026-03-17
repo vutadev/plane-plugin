@@ -27,16 +27,14 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id, parse_identifier, _load_planerc_config
+from scripts.plane_client import get_client, dump_json, resolve_project_id, parse_identifier, load_planerc_config, print_list_response, require_confirm, run_command
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.work_items.list(slug, project_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def cmd_create(args: argparse.Namespace) -> None:
@@ -72,7 +70,14 @@ def cmd_get_by_id(args: argparse.Namespace) -> None:
         project_identifier, sequence = parse_identifier(args.identifier)
     elif args.project_identifier and args.sequence:
         project_identifier = args.project_identifier
-        sequence = int(args.sequence)
+        try:
+            sequence = int(args.sequence)
+        except ValueError:
+            print(
+                f"ERROR: Invalid sequence number '{args.sequence}'. Expected a number.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     else:
         print(
             "ERROR: Provide --identifier PROJECT-123 or both --project-identifier and --sequence.",
@@ -112,7 +117,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    config = _load_planerc_config()
+    config = load_planerc_config()
     if str(config.get("disable_delete_issue", "")).lower() in ("true", "1"):
         print(
             "ERROR: Work item deletion is disabled via 'disable_delete_issue' in .planerc.",
@@ -120,12 +125,7 @@ def cmd_delete(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
     project_id = resolve_project_id(args)
-    if not args.confirm:
-        print(
-            "ERROR: Destructive operation — pass --confirm to proceed.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    require_confirm(args)
     client, slug = get_client()
     client.work_items.delete(slug, project_id, args.work_item_id)
     print(dump_json({"status": "deleted", "work_item_id": args.work_item_id}))
@@ -134,6 +134,15 @@ def cmd_delete(args: argparse.Namespace) -> None:
 def cmd_search(args: argparse.Namespace) -> None:
     client, slug = get_client()
     response = client.work_items.search(slug, args.query)
+    print(dump_json(response.model_dump() if hasattr(response, "model_dump") else response))
+
+
+def cmd_advanced_search(args: argparse.Namespace) -> None:
+    client, slug = get_client()
+    params = {"query": args.query}
+    if args.project_id:
+        params["project_id"] = args.project_id
+    response = client.work_items.advanced_search(slug, **params)
     print(dump_json(response.model_dump() if hasattr(response, "model_dump") else response))
 
 
@@ -187,6 +196,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_search = sub.add_parser("search", help="Search work items")
     p_search.add_argument("--query", required=True, help="Search query")
 
+    # advanced-search
+    p_adv = sub.add_parser("advanced-search", help="Advanced search work items")
+    p_adv.add_argument("--query", required=True, help="Search query")
+    p_adv.add_argument("--project-id", default=None, help="Filter by project UUID")
+
     return parser
 
 
@@ -198,13 +212,14 @@ COMMANDS = {
     "update": cmd_update,
     "delete": cmd_delete,
     "search": cmd_search,
+    "advanced-search": cmd_advanced_search,
 }
 
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    COMMANDS[args.command](args)
+    run_command(COMMANDS[args.command], args)
 
 
 if __name__ == "__main__":

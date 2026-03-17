@@ -28,12 +28,12 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id, _load_planerc_config
+from scripts.plane_client import get_client, dump_json, resolve_project_id, load_planerc_config, print_list_response, require_confirm, run_command
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     client, slug = get_client()
-    config = _load_planerc_config()
+    config = load_planerc_config()
     default_pid = config.get("project_id") or config.get("default_project_id")
     if default_pid:
         # Restricted to a single project
@@ -54,7 +54,7 @@ def cmd_create(args: argparse.Namespace) -> None:
         name=args.name,
         identifier=args.identifier,
         description=args.description or "",
-        network=int(args.network) if args.network else 2,
+        network=int(args.network) if args.network else 2,  # 0=secret, 2=public
     )
     project = client.projects.create(slug, payload)
     print(dump_json(project.model_dump()))
@@ -91,12 +91,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 def cmd_delete(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
-    if not args.confirm:
-        print(
-            "ERROR: Destructive operation — pass --confirm to proceed.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    require_confirm(args)
     client, slug = get_client()
     client.projects.delete(slug, project_id)
     print(dump_json({"status": "deleted", "project_id": project_id}))
@@ -106,8 +101,7 @@ def cmd_members(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     members = client.projects.get_members(slug, project_id)
-    data = [m.model_dump() if hasattr(m, "model_dump") else m for m in members]
-    print(dump_json(data))
+    print_list_response(members)
 
 
 def cmd_features(args: argparse.Namespace) -> None:
@@ -115,6 +109,33 @@ def cmd_features(args: argparse.Namespace) -> None:
     client, slug = get_client()
     features = client.projects.get_features(slug, project_id)
     print(dump_json(features.model_dump()))
+
+
+def cmd_worklog_summary(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    summary = client.projects.get_worklog_summary(slug, project_id)
+    print(dump_json(summary.model_dump() if hasattr(summary, "model_dump") else summary))
+
+
+def cmd_update_features(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    from plane.models.projects import UpdateProject
+    fields: dict = {}
+    if args.cycles is not None:
+        fields["cycles"] = args.cycles.lower() == "true"
+    if args.modules is not None:
+        fields["modules"] = args.modules.lower() == "true"
+    if args.pages is not None:
+        fields["pages"] = args.pages.lower() == "true"
+    if args.inbox is not None:
+        fields["inbox"] = args.inbox.lower() == "true"
+    if not fields:
+        print("ERROR: No feature flags specified.", file=sys.stderr)
+        sys.exit(1)
+    result = client.projects.update_features(slug, project_id, fields)
+    print(dump_json(result.model_dump() if hasattr(result, "model_dump") else result))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -158,6 +179,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_features = sub.add_parser("features", help="Get project features")
     p_features.add_argument("--project-id", default=None, help="Project UUID")
 
+    # worklog-summary
+    p_wl = sub.add_parser("worklog-summary", help="Get project worklog summary")
+    p_wl.add_argument("--project-id", default=None, help="Project UUID")
+
+    # update-features
+    p_uf = sub.add_parser("update-features", help="Update project features")
+    p_uf.add_argument("--project-id", default=None, help="Project UUID")
+    p_uf.add_argument("--cycles", help="Enable/disable cycles (true/false)")
+    p_uf.add_argument("--modules", help="Enable/disable modules (true/false)")
+    p_uf.add_argument("--pages", help="Enable/disable pages (true/false)")
+    p_uf.add_argument("--inbox", help="Enable/disable inbox (true/false)")
+
     return parser
 
 
@@ -169,13 +202,15 @@ COMMANDS = {
     "delete": cmd_delete,
     "members": cmd_members,
     "features": cmd_features,
+    "worklog-summary": cmd_worklog_summary,
+    "update-features": cmd_update_features,
 }
 
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    COMMANDS[args.command](args)
+    run_command(COMMANDS[args.command], args)
 
 
 if __name__ == "__main__":

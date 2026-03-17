@@ -17,16 +17,14 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id
+from scripts.plane_client import get_client, dump_json, resolve_project_id, print_list_response, require_confirm, run_command
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.states.list(slug, project_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def cmd_create(args: argparse.Namespace) -> None:
@@ -73,9 +71,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 
 def cmd_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     client.states.delete(slug, project_id, args.state_id)
@@ -128,7 +124,7 @@ COMMANDS = {
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    COMMANDS[args.command](args)
+    run_command(COMMANDS[args.command], args)
 
 
 if __name__ == "__main__":

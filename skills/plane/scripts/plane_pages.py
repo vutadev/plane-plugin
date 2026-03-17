@@ -6,6 +6,8 @@ Sub-commands:
     get-project       Get a project page by ID
     create-workspace  Create a workspace page
     create-project    Create a project page
+
+Note: The Plane SDK currently only supports create and retrieve for pages.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id
+from scripts.plane_client import get_client, dump_json, resolve_project_id, print_list_response, require_confirm, run_command
 
 
 def cmd_get_workspace(args: argparse.Namespace) -> None:
@@ -96,7 +98,7 @@ COMMANDS = {
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    COMMANDS[args.command](args)
+    run_command(COMMANDS[args.command], args)
 
 
 if __name__ == "__main__":

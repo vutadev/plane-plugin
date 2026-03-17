@@ -27,16 +27,14 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id
+from scripts.plane_client import get_client, dump_json, resolve_project_id, print_list_response, require_confirm, run_command
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.cycles.list(slug, project_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def cmd_create(args: argparse.Namespace) -> None:
@@ -90,9 +88,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 
 def cmd_delete(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     client, slug = get_client()
     client.cycles.delete(slug, project_id, args.cycle_id)
     print(dump_json({"status": "deleted", "cycle_id": args.cycle_id}))
@@ -131,9 +127,14 @@ def cmd_list_items(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.cycles.list_work_items(slug, project_id, args.cycle_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
+
+
+def cmd_list_archived(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    response = client.cycles.list_archived(slug, project_id)
+    print_list_response(response)
 
 
 def cmd_transfer_items(args: argparse.Namespace) -> None:
@@ -216,6 +217,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_list_items.add_argument("--project-id", default=None, help="Project UUID")
     p_list_items.add_argument("--cycle-id", required=True, help="Cycle UUID")
 
+    # list-archived
+    p_list_archived = sub.add_parser("list-archived", help="List archived cycles")
+    p_list_archived.add_argument("--project-id", default=None, help="Project UUID")
+
     # transfer-items
     p_transfer = sub.add_parser("transfer-items", help="Transfer work items to another cycle")
     p_transfer.add_argument("--project-id", default=None, help="Project UUID")
@@ -236,6 +241,7 @@ COMMANDS = {
     "add-items": cmd_add_items,
     "remove-item": cmd_remove_item,
     "list-items": cmd_list_items,
+    "list-archived": cmd_list_archived,
     "transfer-items": cmd_transfer_items,
 }
 
@@ -243,7 +249,7 @@ COMMANDS = {
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    COMMANDS[args.command](args)
+    run_command(COMMANDS[args.command], args)
 
 
 if __name__ == "__main__":

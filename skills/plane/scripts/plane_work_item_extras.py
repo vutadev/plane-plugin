@@ -3,6 +3,7 @@
 
 Top-level sub-commands (resource groups):
     activities   Work item activities (list, get)
+    attachments  Work item attachments (list, get, create, update, delete)
     comments     Work item comments (list, get, create, update, delete)
     links        Work item links (list, get, create, update, delete)
     relations    Work item relations (list, create, delete)
@@ -23,7 +24,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.plane_client import get_client, dump_json, resolve_project_id
+from scripts.plane_client import get_client, dump_json, resolve_project_id, print_list_response, require_confirm, run_command
 
 
 # ── Activities ────────────────────────────────────────────────────────────────
@@ -32,9 +33,7 @@ def activities_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.work_items.activities.list(slug, project_id, args.work_item_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def activities_get(args: argparse.Namespace) -> None:
@@ -46,15 +45,73 @@ def activities_get(args: argparse.Namespace) -> None:
     print(dump_json(activity.model_dump()))
 
 
+# ── Attachments ────────────────────────────────────────────────────────────────
+
+def attachments_list(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    response = client.work_items.attachments.list(slug, project_id, args.work_item_id)
+    print_list_response(response)
+
+
+def attachments_get(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    attachment = client.work_items.attachments.retrieve(
+        slug, project_id, args.work_item_id, args.attachment_id
+    )
+    print(dump_json(attachment.model_dump()))
+
+
+def attachments_create(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    from plane.models.work_items import WorkItemAttachmentUploadRequest
+
+    payload = WorkItemAttachmentUploadRequest(file_path=args.file_path)
+    attachment = client.work_items.attachments.create(
+        slug, project_id, args.work_item_id, payload
+    )
+    print(dump_json(attachment.model_dump()))
+
+
+def attachments_update(args: argparse.Namespace) -> None:
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    from plane.models.work_items import UpdateWorkItemAttachment
+
+    fields: dict = {}
+    if args.name:
+        fields["name"] = args.name
+
+    if not fields:
+        print("ERROR: No update fields specified.", file=sys.stderr)
+        sys.exit(1)
+
+    payload = UpdateWorkItemAttachment(**fields)
+    attachment = client.work_items.attachments.update(
+        slug, project_id, args.work_item_id, args.attachment_id, payload
+    )
+    print(dump_json(attachment.model_dump()))
+
+
+def attachments_delete(args: argparse.Namespace) -> None:
+    require_confirm(args)
+    project_id = resolve_project_id(args)
+    client, slug = get_client()
+    client.work_items.attachments.delete(
+        slug, project_id, args.work_item_id, args.attachment_id
+    )
+    print(dump_json({"status": "deleted", "attachment_id": args.attachment_id}))
+
+
 # ── Comments ──────────────────────────────────────────────────────────────────
 
 def comments_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.work_items.comments.list(slug, project_id, args.work_item_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def comments_get(args: argparse.Namespace) -> None:
@@ -91,9 +148,7 @@ def comments_update(args: argparse.Namespace) -> None:
 
 
 def comments_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.comments.delete(
@@ -108,9 +163,7 @@ def links_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     response = client.work_items.links.list(slug, project_id, args.work_item_id)
-    results = response.results if hasattr(response, "results") else response
-    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
-    print(dump_json(data))
+    print_list_response(response)
 
 
 def links_get(args: argparse.Namespace) -> None:
@@ -161,9 +214,7 @@ def links_update(args: argparse.Namespace) -> None:
 
 
 def links_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.links.delete(
@@ -202,9 +253,7 @@ def relations_create(args: argparse.Namespace) -> None:
 
 
 def relations_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     from plane.models.work_items import RemoveWorkItemRelation
@@ -225,8 +274,7 @@ def work_logs_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     logs = client.work_items.work_logs.list(slug, project_id, args.work_item_id)
-    data = [l.model_dump() if hasattr(l, "model_dump") else l for l in logs]
-    print(dump_json(data))
+    print_list_response(logs)
 
 
 def work_logs_create(args: argparse.Namespace) -> None:
@@ -261,9 +309,7 @@ def work_logs_update(args: argparse.Namespace) -> None:
 
 
 def work_logs_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_items.work_logs.delete(
@@ -278,8 +324,7 @@ def types_list(args: argparse.Namespace) -> None:
     project_id = resolve_project_id(args)
     client, slug = get_client()
     types = client.work_item_types.list(slug, project_id)
-    data = [t.model_dump() if hasattr(t, "model_dump") else t for t in types]
-    print(dump_json(data))
+    print_list_response(types)
 
 
 def types_get(args: argparse.Namespace) -> None:
@@ -324,9 +369,7 @@ def types_update(args: argparse.Namespace) -> None:
 
 
 def types_delete(args: argparse.Namespace) -> None:
-    if not args.confirm:
-        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
-        sys.exit(1)
+    require_confirm(args)
     project_id = resolve_project_id(args)
     client, slug = get_client()
     client.work_item_types.delete(slug, project_id, args.type_id)
@@ -358,6 +401,31 @@ def build_parser() -> argparse.ArgumentParser:
     act_get = act_sub.add_parser("get", help="Get activity by ID")
     _add_wi_args(act_get)
     act_get.add_argument("--activity-id", required=True, help="Activity UUID")
+
+    # ── attachments ──
+    p_att = top.add_parser("attachments", help="Work item attachments")
+    att_sub = p_att.add_subparsers(dest="action", required=True)
+
+    att_list = att_sub.add_parser("list", help="List attachments")
+    _add_wi_args(att_list)
+
+    att_get = att_sub.add_parser("get", help="Get attachment by ID")
+    _add_wi_args(att_get)
+    att_get.add_argument("--attachment-id", required=True, help="Attachment UUID")
+
+    att_create = att_sub.add_parser("create", help="Upload an attachment")
+    _add_wi_args(att_create)
+    att_create.add_argument("--file-path", required=True, help="Path to file to upload")
+
+    att_update = att_sub.add_parser("update", help="Update an attachment")
+    _add_wi_args(att_update)
+    att_update.add_argument("--attachment-id", required=True, help="Attachment UUID")
+    att_update.add_argument("--name", help="New attachment name")
+
+    att_delete = att_sub.add_parser("delete", help="Delete an attachment")
+    _add_wi_args(att_delete)
+    att_delete.add_argument("--attachment-id", required=True, help="Attachment UUID")
+    att_delete.add_argument("--confirm", action="store_true", help="Confirm deletion")
 
     # ── comments ──
     p_com = top.add_parser("comments", help="Work item comments")
@@ -487,6 +555,11 @@ def build_parser() -> argparse.ArgumentParser:
 DISPATCH = {
     ("activities", "list"): activities_list,
     ("activities", "get"): activities_get,
+    ("attachments", "list"): attachments_list,
+    ("attachments", "get"): attachments_get,
+    ("attachments", "create"): attachments_create,
+    ("attachments", "update"): attachments_update,
+    ("attachments", "delete"): attachments_delete,
     ("comments", "list"): comments_list,
     ("comments", "get"): comments_get,
     ("comments", "create"): comments_create,
@@ -519,7 +592,7 @@ def main() -> None:
     handler = DISPATCH.get(key)
     if not handler:
         parser.error(f"Unknown command: {args.resource} {args.action}")
-    handler(args)
+    run_command(handler, args)
 
 
 if __name__ == "__main__":

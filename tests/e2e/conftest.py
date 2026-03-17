@@ -20,8 +20,11 @@ from typing import Any
 
 import pytest
 
+# Project root (repo root)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 # Path to the skill scripts
-SKILL_ROOT = Path(__file__).resolve().parent.parent.parent / "skills" / "plane"
+SKILL_ROOT = PROJECT_ROOT / "skills" / "plane"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 
 # Required environment variables for E2E tests
@@ -55,11 +58,30 @@ class CLIResult:
         return f"CLIResult(returncode={self.returncode}, stdout={self.stdout[:200]}...)"
 
 
+def _parse_planerc() -> dict[str, str]:
+    """Parse .planerc file from project root and return key-value pairs."""
+    rc_path = PROJECT_ROOT / ".planerc"
+    config: dict[str, str] = {}
+    if rc_path.is_file():
+        for line in rc_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                config[key.strip()] = value.strip()
+    return config
+
+
 def has_credentials() -> bool:
-    """Check if required API credentials are available."""
+    """Check if required API credentials are available via env vars or .planerc."""
     has_auth = any(os.environ.get(var) for var in API_AUTH_VARS)
     has_workspace = bool(os.environ.get("PLANE_WORKSPACE_SLUG"))
-    return has_auth and has_workspace
+    if has_auth and has_workspace:
+        return True
+    # Fallback: check .planerc
+    rc = _parse_planerc()
+    return bool(rc.get("api_key")) and bool(rc.get("workspace"))
 
 
 def skip_if_no_credentials() -> None:
@@ -90,6 +112,7 @@ def run_cli(script_name: str, *args: str, check: bool = True) -> CLIResult:
         capture_output=True,
         text=True,
         timeout=60,
+        cwd=PROJECT_ROOT,
     )
 
     cli_result = CLIResult(
@@ -124,11 +147,13 @@ def generate_test_name(prefix: str) -> str:
 
 @pytest.fixture(scope="session")
 def test_workspace() -> str:
-    """Get the test workspace slug from environment."""
+    """Get the test workspace slug from environment or .planerc."""
     skip_if_no_credentials()
     workspace = os.environ.get("PLANE_WORKSPACE_SLUG")
     if not workspace:
-        pytest.skip("PLANE_WORKSPACE_SLUG not set")
+        workspace = _parse_planerc().get("workspace")
+    if not workspace:
+        pytest.skip("Workspace slug not found in env vars or .planerc")
     return workspace
 
 
@@ -278,6 +303,31 @@ def cleanup_registry() -> list[dict[str, Any]]:
                     "delete",
                     "--project-id", item["project_id"],
                     "--label-id", item["id"],
+                    "--confirm",
+                    check=False,
+                )
+            elif item["type"] == "milestone":
+                run_cli(
+                    "plane_milestones.py",
+                    "delete",
+                    "--project-id", item["project_id"],
+                    "--milestone-id", item["id"],
+                    "--confirm",
+                    check=False,
+                )
+            elif item["type"] == "sticky":
+                run_cli(
+                    "plane_stickies.py",
+                    "delete",
+                    "--sticky-id", item["id"],
+                    "--confirm",
+                    check=False,
+                )
+            elif item["type"] == "teamspace":
+                run_cli(
+                    "plane_teamspaces.py",
+                    "delete",
+                    "--teamspace-id", item["id"],
                     "--confirm",
                     check=False,
                 )

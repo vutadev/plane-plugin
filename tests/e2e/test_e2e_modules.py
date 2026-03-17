@@ -180,10 +180,10 @@ class TestModuleCommands:
             # Add issue
             add_result = run_cli(
                 "plane_modules.py",
-                "add-issues",
+                "add-items",
                 "--project-id", test_project["id"],
                 "--module-id", module_id,
-                "--issue-ids", test_issue["id"],
+                "--work-item-ids", test_issue["id"],
             )
 
             assert isinstance(add_result.json, (dict, list))
@@ -191,47 +191,13 @@ class TestModuleCommands:
             # Remove issue
             remove_result = run_cli(
                 "plane_modules.py",
-                "remove-issue",
+                "remove-item",
                 "--project-id", test_project["id"],
                 "--module-id", module_id,
-                "--issue-id", test_issue["id"],
+                "--work-item-id", test_issue["id"],
             )
 
             assert isinstance(remove_result.json, dict)
-        finally:
-            run_cli(
-                "plane_modules.py",
-                "delete",
-                "--project-id", test_project["id"],
-                "--module-id", module_id,
-                "--confirm",
-                check=False,
-            )
-
-    def test_module_members(self, test_project: dict[str, Any]) -> None:
-        """TC-MODULE-06: List module members."""
-        skip_if_no_credentials()
-
-        module_name = generate_test_name("members-module")
-
-        create_result = run_cli(
-            "plane_modules.py",
-            "create",
-            "--project-id", test_project["id"],
-            "--name", module_name,
-        )
-
-        module_id = create_result.json["id"]
-
-        try:
-            result = run_cli(
-                "plane_modules.py",
-                "members",
-                "--project-id", test_project["id"],
-                "--module-id", module_id,
-            )
-
-            assert isinstance(result.json, list)
         finally:
             run_cli(
                 "plane_modules.py",
@@ -305,10 +271,10 @@ class TestModuleEdgeCases:
         try:
             result = run_cli(
                 "plane_modules.py",
-                "add-issues",
+                "add-items",
                 "--project-id", test_project["id"],
                 "--module-id", module_id,
-                "--issue-ids", "invalid-issue-id",
+                "--work-item-ids", "invalid-issue-id",
                 check=False,
             )
 

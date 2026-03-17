@@ -37,6 +37,12 @@ SCRIPTS = [
     "scripts.plane_users",
     "scripts.plane_workspaces",
     "scripts.plane_work_item_extras",
+    "scripts.plane_stickies",
+    "scripts.plane_epics",
+    "scripts.plane_customers",
+    "scripts.plane_teamspaces",
+    "scripts.plane_work_item_properties",
+    "scripts.plane_milestones",
 ]
 
 SCRIPT_FILES_WITH_HELP = [
@@ -54,6 +60,12 @@ SCRIPT_FILES_WITH_HELP = [
     "scripts/plane_users.py",
     "scripts/plane_workspaces.py",
     "scripts/plane_work_item_extras.py",
+    "scripts/plane_stickies.py",
+    "scripts/plane_epics.py",
+    "scripts/plane_customers.py",
+    "scripts/plane_teamspaces.py",
+    "scripts/plane_work_item_properties.py",
+    "scripts/plane_milestones.py",
 ]
 
 
@@ -206,6 +218,84 @@ class TestArgParsing:
         ])
         assert args.command == "add-items"
         assert args.work_item_ids == "id1,id2"
+
+    def test_cycles_list_archived_args(self) -> None:
+        from scripts.plane_cycles import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list-archived", "--project-id", "p1"])
+        assert args.command == "list-archived"
+
+    def test_modules_list_archived_args(self) -> None:
+        from scripts.plane_modules import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list-archived", "--project-id", "p1"])
+        assert args.command == "list-archived"
+
+    def test_work_items_advanced_search_args(self) -> None:
+        from scripts.plane_work_items import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["advanced-search", "--query", "test"])
+        assert args.command == "advanced-search"
+        assert args.query == "test"
+
+    def test_stickies_list_args(self) -> None:
+        from scripts.plane_stickies import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list"])
+        assert args.command == "list"
+
+    def test_epics_list_args(self) -> None:
+        from scripts.plane_epics import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list", "--project-id", "p1"])
+        assert args.command == "list"
+
+    def test_customers_list_args(self) -> None:
+        from scripts.plane_customers import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list"])
+        assert args.resource == "list"
+
+    def test_teamspaces_create_args(self) -> None:
+        from scripts.plane_teamspaces import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["create", "--name", "Test Team"])
+        assert args.resource == "create"
+        assert args.name == "Test Team"
+
+    def test_milestones_create_args(self) -> None:
+        from scripts.plane_milestones import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["create", "--project-id", "p1", "--name", "M1"])
+        assert args.command == "create"
+        assert args.name == "M1"
+
+    def test_work_item_properties_list_args(self) -> None:
+        from scripts.plane_work_item_properties import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(["list", "--project-id", "p1"])
+        assert args.resource == "list"
+
+    def test_work_item_extras_attachments_list(self) -> None:
+        from scripts.plane_work_item_extras import build_parser
+
+        parser = build_parser()
+        args = parser.parse_args([
+            "attachments", "list",
+            "--project-id", "p1",
+            "--work-item-id", "w1",
+        ])
+        assert args.resource == "attachments"
+        assert args.action == "list"
 
     def test_work_item_extras_comments_create(self) -> None:
         from scripts.plane_work_item_extras import build_parser

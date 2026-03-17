@@ -211,10 +211,10 @@ class TestCycleCommands:
             # Add issue to cycle
             add_result = run_cli(
                 "plane_cycles.py",
-                "add-issues",
+                "add-items",
                 "--project-id", test_project["id"],
                 "--cycle-id", cycle_id,
-                "--issue-ids", test_issue["id"],
+                "--work-item-ids", test_issue["id"],
             )
 
             # Verify issue was added (response format may vary)
@@ -223,10 +223,10 @@ class TestCycleCommands:
             # Remove issue from cycle
             remove_result = run_cli(
                 "plane_cycles.py",
-                "remove-issue",
+                "remove-item",
                 "--project-id", test_project["id"],
                 "--cycle-id", cycle_id,
-                "--issue-id", test_issue["id"],
+                "--work-item-id", test_issue["id"],
             )
 
             assert isinstance(remove_result.json, dict)
@@ -353,10 +353,10 @@ class TestCycleEdgeCases:
         try:
             result = run_cli(
                 "plane_cycles.py",
-                "add-issues",
+                "add-items",
                 "--project-id", test_project["id"],
                 "--cycle-id", cycle_id,
-                "--issue-ids", "invalid-issue-id",
+                "--work-item-ids", "invalid-issue-id",
                 check=False,
             )
 

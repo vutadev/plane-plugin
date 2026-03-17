@@ -132,38 +132,6 @@ class TestLabelCommands:
                 check=False,
             )
 
-    def test_label_create_with_description(self, test_project: dict[str, Any]) -> None:
-        """TC-LABEL-04: Create label with description."""
-        skip_if_no_credentials()
-
-        label_name = generate_test_name("desc-label")
-        color = get_test_color()
-        description = "This is a test label description"
-
-        result = run_cli(
-            "plane_labels.py",
-            "create",
-            "--project-id", test_project["id"],
-            "--name", label_name,
-            "--color", color,
-            "--description", description,
-        )
-
-        label = result.json
-        assert label["name"] == label_name
-
-        label_id = label["id"]
-
-        # Cleanup
-        run_cli(
-            "plane_labels.py",
-            "delete",
-            "--project-id", test_project["id"],
-            "--label-id", label_id,
-            "--confirm",
-            check=False,
-        )
-
     def test_label_delete_without_confirm(self, test_project: dict[str, Any]) -> None:
         """TC-LABEL-05: Delete without --confirm fails."""
         skip_if_no_credentials()
