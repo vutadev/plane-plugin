@@ -21,6 +21,7 @@ Supported formats (auto-detected):
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import json
 from pathlib import Path
@@ -69,31 +70,59 @@ def _parse_planerc(text: str, path: Path) -> dict:
     return config
 
 
-def _load_planerc_config() -> dict:
-    """Load config from ~/.planerc (global) merged with $PWD/.planerc (local).
+def _resolve_project_dir() -> Path:
+    """Resolve the project root directory.
 
-    Returns merged config dict. Project-local values override global.
+    Fallback chain:
+        1. $PLANE_PROJECT_DIR  (explicit, agent-agnostic)
+        2. $CLAUDE_PROJECT_DIR (Claude Code specific)
+        3. git rev-parse --show-toplevel (any git project)
+        4. $PWD (last resort)
+    """
+    for env_var in ("PLANE_PROJECT_DIR", "CLAUDE_PROJECT_DIR"):
+        val = os.environ.get(env_var)
+        if val:
+            return Path(val)
+
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return Path(result.stdout.strip())
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return Path.cwd()
+
+
+def load_planerc_config() -> dict:
+    """Load config from project .planerc (local) or ~/.planerc (global).
+
+    If a local .planerc exists, it is used exclusively (global is ignored).
+    If no local .planerc exists, the global ~/.planerc is used.
+    This prevents mixing credentials from different scopes.
+
+    Project dir resolution: $PLANE_PROJECT_DIR > $CLAUDE_PROJECT_DIR > git root > $PWD.
     Results are cached for the lifetime of the process.
     """
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
         return _CONFIG_CACHE
-    config: dict = {}
     global_path = Path.home() / ".planerc"
+    project_path = _resolve_project_dir() / ".planerc"
 
-    project_path = Path.cwd() / ".planerc"
-
-    candidates = [global_path, project_path]
-
-    for path in candidates:
-        if path.is_file():
-            try:
-                text = path.read_text()
-            except OSError as exc:
-                print(f"ERROR: Cannot read {path}: {exc}", file=sys.stderr)
-                sys.exit(1)
-            data = _parse_planerc(text, path)
-            config.update(data)
+    chosen = project_path if project_path.is_file() else global_path
+    config: dict = {}
+    if chosen.is_file():
+        try:
+            text = chosen.read_text()
+        except OSError as exc:
+            print(f"ERROR: Cannot read {chosen}: {exc}", file=sys.stderr)
+            sys.exit(1)
+        config = _parse_planerc(text, chosen)
 
     _CONFIG_CACHE = config
     return config
@@ -108,7 +137,7 @@ def get_client() -> tuple["PlaneClient", str]:
     Raises:
         SystemExit: if required config fields are missing.
     """
-    config = _load_planerc_config()
+    config = load_planerc_config()
 
     api_key = config.get("api_key")
     access_token = config.get("access_token")
@@ -155,7 +184,7 @@ def resolve_project_id(args: argparse.Namespace) -> str:
     pid = getattr(args, "project_id", None)
     if pid:
         return pid
-    config = _load_planerc_config()
+    config = load_planerc_config()
     pid = config.get("project_id") or config.get("default_project_id")
     if pid:
         return pid
@@ -187,18 +216,45 @@ def parse_identifier(identifier: str) -> tuple[str, int]:
     return project_part, sequence
 
 
-def json_serial(obj: object) -> str:
+def json_serial(obj: object) -> object:
     """JSON serializer for objects not serializable by default."""
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
     if hasattr(obj, "model_dump"):
-        return obj.model_dump()  # type: ignore[return-value]
+        return obj.model_dump()
     if hasattr(obj, "__dict__"):
-        return obj.__dict__  # type: ignore[return-value]
+        return obj.__dict__
     return str(obj)
 
 
 def dump_json(data: object) -> str:
     """Serialize data to a pretty-printed JSON string."""
     return json.dumps(data, indent=2, default=json_serial)
+
+
+def print_list_response(response: object) -> None:
+    """Extract results from a paginated response and print as JSON."""
+    results = response.results if hasattr(response, "results") else response
+    data = [r.model_dump() if hasattr(r, "model_dump") else r for r in results]
+    print(dump_json(data))
+
+
+def require_confirm(args: argparse.Namespace) -> None:
+    """Exit with error if --confirm was not passed."""
+    if not args.confirm:
+        print("ERROR: Destructive operation — pass --confirm to proceed.", file=sys.stderr)
+        sys.exit(1)
+
+
+def run_command(handler: callable, args: argparse.Namespace) -> None:
+    """Run a command handler with top-level exception handling."""
+    try:
+        handler(args)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------

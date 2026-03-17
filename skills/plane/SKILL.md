@@ -6,7 +6,7 @@ argument-hint: "[init]"
 
 # Plane Agent Skill
 
-Interact with [Plane](https://plane.so) — an open-source project management platform — via CLI scripts wrapping `plane-sdk==0.2.2`.
+Interact with [Plane](https://plane.so) — an open-source project management platform — via CLI scripts wrapping `plane-sdk>=0.2.6`.
 
 ## Path Resolution (Plugin Layout)
 
@@ -15,12 +15,14 @@ Resolve all relative paths from this directory:
 
 - Scripts: `scripts/...`
 - References: `references/...`
-- Config: `~/.planerc` (global) + `./.planerc` (project override, KEY=VALUE or JSON format)
+- Config: `~/.planerc` (global) or `./.planerc` (project-local, if present global is ignored; KEY=VALUE or JSON format)
 - Requirements: `requirements.txt`
 
 ## Configuration (.planerc)
 
-Config is read from `~/.planerc` (global) and `./.planerc` (project-local). Local values override global on a per-field basis.
+Config is read from `<project-root>/.planerc` (project-local) if it exists, otherwise from `~/.planerc` (global). When a local `.planerc` is present, the global file is completely ignored — no field-level merging occurs.
+
+Project root is resolved via: `$PLANE_PROJECT_DIR` > `$CLAUDE_PROJECT_DIR` > `git rev-parse --show-toplevel` > `$PWD`. For non-Claude agents, set `PLANE_PROJECT_DIR` to the project root.
 
 Supported formats (auto-detected):
 
@@ -146,7 +148,13 @@ All scripts output JSON. Use `--help` for full argument details.
 | `plane_states.py` | `list` `create` `get` `update` `delete` |
 | `plane_pages.py` | `get-workspace` `get-project` `create-workspace` `create-project` |
 | `plane_users.py` | `me` |
-| `plane_workspaces.py` | `members` `features` |
+| `plane_workspaces.py` | `members` `features` `update-features` |
+| `plane_customers.py` | `list` `create` `get` `update` `delete` + `properties` `requests` sub-resources |
+| `plane_epics.py` | `list` `get` |
+| `plane_milestones.py` | `list` `create` `get` `update` `delete` `add-items` `remove-items` `list-items` |
+| `plane_stickies.py` | `list` `create` `get` `update` `delete` |
+| `plane_teamspaces.py` | `list` `create` `get` `update` `delete` + `members` `projects` sub-resources |
+| `plane_work_item_properties.py` | `list` `create` `get` `update` `delete` + `options` `values` sub-resources |
 
 → Full args: `references/api-extended.md`
 

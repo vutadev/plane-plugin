@@ -1,6 +1,6 @@
 {
   "name": "plane",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Manage projects, work items, cycles, modules on Plane via plane-sdk",
   "author": { "name": "anhvu" },
   "license": "MIT",
